@@ -1,8 +1,29 @@
 {
-  "name": "module-frontend",
+  "name": "@core/module-frontend",
   "version": "0.1.0",
   "description": "Remote modules para micro-frontends via manifesto dinâmico e registro global na window (sem Module Federation).",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fidelis27/module-frontend.git"
+  },
+  "homepage": "https://github.com/fidelis27/module-frontend#readme",
+  "bugs": {
+    "url": "https://github.com/fidelis27/module-frontend/issues"
+  },
+  "keywords": [
+    "micro-frontend",
+    "remote-modules",
+    "react",
+    "module-federation-alternative"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
