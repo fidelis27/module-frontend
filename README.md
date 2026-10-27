@@ -3,14 +3,14 @@
 Remote modules para micro-frontends: o Provider publica bundles + um manifesto dinâmico, o Consumer carrega o módulo e o monta numa raiz React isolada. Sem Module Federation; o registro é feito na `window`.
 
 ```
-npm i @core/module-frontend react react-dom
+npm i @fidelis27/module-frontend react react-dom
 ```
 
 ## Provider
 
 ```tsx
 // app/modules/cart/index.tsx
-import { Modularize } from '@core/module-frontend/client';
+import { Modularize } from '@fidelis27/module-frontend/client';
 
 export default Modularize('cart', ({ entityId }) => <p>{entityId}</p>, { appName: 'shop' });
 ```
@@ -18,7 +18,7 @@ export default Modularize('cart', ({ entityId }) => <p>{entityId}</p>, { appName
 Gere um bundle IIFE por módulo (`dist/modules/cart.js`) e sirva com o middleware:
 
 ```js
-import { serveModules } from '@core/module-frontend/server';
+import { serveModules } from '@fidelis27/module-frontend/server';
 
 app.use(serveModules({
   modulesPath: './dist/modules',
@@ -31,7 +31,7 @@ app.use(serveModules({
 ## Consumer
 
 ```tsx
-import { Module } from '@core/module-frontend/client';
+import { Module } from '@fidelis27/module-frontend/client';
 
 <Module
   name="cart"
