@@ -1,5 +1,5 @@
 {
-  "name": "@fidelis27/module-frontend",
+  "name": "@lib-core-mfe/module-frontend",
   "version": "0.1.0",
   "description": "Remote modules para micro-frontends via manifesto dinâmico e registro global na window (sem Module Federation).",
   "license": "MIT",
