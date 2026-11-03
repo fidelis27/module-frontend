@@ -47,16 +47,38 @@ import { Module } from '@lib-core-mfe/module-frontend/client';
 
 Props desconhecidas (`entityId`, callbacks...) vão direto ao módulo remoto.
 
+### Isolamento de CSS (`isolate`)
+
+```tsx
+<Module name="cart" host={HOST} allowedHosts={[HOST]} isolate />
+```
+
+Com `isolate`, o módulo é montado num **Shadow DOM**: o CSS do host não entra no módulo, o CSS do módulo não vaza para o host e a herança de fonte/cor do host é cortada (`:host { all: initial }`).
+
+O Provider declara o CSS do módulo como texto, e o Consumer o injeta dentro do shadow root:
+
+```tsx
+Modularize('cart', Cart, { appName: 'shop', styles: cssText }); // string ou string[]
+```
+
+Cuidados:
+- `<style>` colocado em `document.head` (style-loader, por exemplo) **não alcança** o shadow root. Em módulos usados com `isolate`, gere o CSS como texto (ex.: `?inline` no Vite, `css-loader` com `exportType: 'string'` no Webpack) e passe em `styles`.
+- Portais (modais, tooltips) devem apontar para o shadow root. Ele chega no módulo por `useContext(ModuleContext).shadowRoot`.
+- `isolate` isola CSS, não JavaScript: `window`, `localStorage` e eventos globais continuam compartilhados.
+- Variáveis CSS (`--cor`) do host **atravessam** a fronteira. Use isso para temas, se quiser.
+
 ## Garantias e limites
 
 - **Allowlist:** por padrão só a mesma origem da página é aceita; qualquer outro host precisa estar em `allowedHosts`. Carregar script remoto é execução de código de terceiros.
 - **Cache:** scripts saem com `?v=<hash>` e `immutable`; o manifesto é `no-cache`.
-- **Isolamento:** o módulo usa o React do próprio bundle. Estilos CSS **não** são isolados.
+- **Isolamento de React:** o módulo usa o React do próprio bundle (o Provider precisa de React ≥ 18, porque usa `react-dom/client`).
+- **Isolamento de CSS:** só com `<Module isolate />` (veja acima).
 - **Falhas:** erro de rede, timeout, módulo ausente e erro de render chegam em `onError`; falhas não ficam em cache.
 
 ## Desenvolvimento
 
 ```
-npm test        # unitários + e2e com bundles reais
+npm test               # unitários + e2e com bundles reais (jsdom)
+npm run test:browser   # isolamento de CSS em Chromium real (CHROMIUM_PATH opcional)
 npm run build   # tsup (esm + cjs + d.ts)
 ```

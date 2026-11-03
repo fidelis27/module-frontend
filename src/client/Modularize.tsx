@@ -20,7 +20,7 @@ export function Modularize<P extends object = Record<string, unknown>>(
   Component: ComponentType<P>,
   options: ModularizeOptions,
 ): RemoteModuleEntry<P> {
-  const { appName, I18n, onCriticalFailure } = options;
+  const { appName, I18n, onCriticalFailure, styles } = options;
 
   if (!appName) throw new Error(`Modularize("${name}"): appName é obrigatório`);
   if (!name) throw new Error('Modularize: name é obrigatório');
@@ -58,6 +58,7 @@ export function Modularize<P extends object = Record<string, unknown>>(
     ModuleContext,
     Component: Wrapped,
     I18n,
+    styles: styles === undefined ? undefined : ([] as string[]).concat(styles),
   };
 
   registry[key] = entry;

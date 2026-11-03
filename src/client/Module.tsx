@@ -9,6 +9,12 @@ export interface ModuleProps {
   path?: string;
   allowedHosts?: string[];
   timeoutMs?: number;
+  /**
+   * Monta o módulo dentro de um Shadow DOM: o CSS do host não entra no módulo
+   * e o do módulo não vaza para o host. Estilos do módulo precisam ser
+   * declarados em `Modularize(..., { styles })` para serem injetados no shadow root.
+   */
+  isolate?: boolean;
   /** Renderizado enquanto o módulo carrega. */
   loading?: ReactNode;
   /** Renderizado se o carregamento falhar. */
@@ -19,6 +25,9 @@ export interface ModuleProps {
   [prop: string]: unknown;
 }
 
+/** Base do shadow root: corta a herança de estilos do host (fonte, cor, etc.). */
+const SHADOW_BASE_CSS = ':host{all:initial;display:block}';
+
 /** Lado Consumer: carrega o módulo remoto e o monta numa raiz React isolada. */
 export function Module(props: ModuleProps) {
   const {
@@ -27,6 +36,7 @@ export function Module(props: ModuleProps) {
     path,
     allowedHosts,
     timeoutMs,
+    isolate = false,
     loading = null,
     fallback = null,
     onError,
@@ -36,6 +46,7 @@ export function Module(props: ModuleProps) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<Root | null>(null);
+  const shadowRef = useRef<ShadowRoot | null>(null);
   const [entry, setEntry] = useState<RemoteModuleEntry | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
@@ -68,17 +79,48 @@ export function Module(props: ModuleProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [host, name, path, allowedKey, timeoutMs]);
 
-  // Cria/destrói a raiz isolada quando o módulo carrega.
+  // Cria/destrói a raiz isolada quando o módulo carrega (ou quando `isolate` muda).
   useEffect(() => {
-    if (!entry || !containerRef.current) return;
-    const root = entry.createRoot(containerRef.current);
+    const container = containerRef.current;
+    if (!entry || !container) return;
+
+    let mountPoint: Element = container;
+    let shadow: ShadowRoot | null = null;
+
+    if (isolate) {
+      if (typeof container.attachShadow !== 'function') {
+        const e = new Error('isolate requer Shadow DOM, que este ambiente não suporta');
+        setError(e);
+        onErrorRef.current?.(e);
+        return;
+      }
+      // attachShadow só pode ser chamado uma vez por elemento: reaproveita o existente
+      // (ex.: efeitos duplicados do StrictMode) e limpa o conteúdo anterior.
+      shadow = container.shadowRoot ?? container.attachShadow({ mode: 'open' });
+      shadow.replaceChildren();
+
+      const base = document.createElement('style');
+      base.textContent = SHADOW_BASE_CSS;
+      shadow.appendChild(base);
+      for (const css of entry.styles ?? []) {
+        const style = document.createElement('style');
+        style.textContent = css;
+        shadow.appendChild(style);
+      }
+      mountPoint = document.createElement('div');
+      shadow.appendChild(mountPoint);
+    }
+
+    const root = entry.createRoot(mountPoint);
     rootRef.current = root;
+    shadowRef.current = shadow;
     return () => {
       rootRef.current = null;
+      shadowRef.current = null;
       // Adia o unmount: desmontar síncrono durante o commit do React pai gera warning.
       queueMicrotask(() => root.unmount());
     };
-  }, [entry]);
+  }, [entry, isolate]);
 
   // Re-renderiza o módulo remoto a cada mudança de props.
   useEffect(() => {
@@ -93,7 +135,7 @@ export function Module(props: ModuleProps) {
     root.render(
       entry.createElement(
         entry.ModuleContext.Provider,
-        { value: { appName: entry.appName, name: entry.name } },
+        { value: { appName: entry.appName, name: entry.name, shadowRoot: shadowRef.current } },
         entry.createElement(entry.Component, {
           ...moduleProps,
           moduleLifeCycleEvent: lifeCycle,
@@ -108,6 +150,8 @@ export function Module(props: ModuleProps) {
     'div',
     { 'data-module': name },
     !entry && loading,
-    createElement('div', { ref: containerRef }),
+    // `key` recria o elemento quando `isolate` muda: um elemento que já recebeu
+    // attachShadow não pode voltar a ser um container comum.
+    createElement('div', { ref: containerRef, key: isolate ? 'shadow' : 'light' }),
   );
 }

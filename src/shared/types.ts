@@ -22,6 +22,8 @@ export interface ModuleLifeCycleEvent {
 export interface ModuleContextValue {
   appName: string;
   name: string;
+  /** Shadow root onde o módulo está montado (só com `isolate`). Use como alvo de portais e style tags. */
+  shadowRoot?: ShadowRoot | null;
   [key: string]: unknown;
 }
 
@@ -34,11 +36,18 @@ export interface RemoteModuleEntry<P = Record<string, unknown>> {
   ModuleContext: Context<ModuleContextValue | null>;
   Component: ComponentType<P & { moduleLifeCycleEvent?: ModuleLifeCycleEvent }>;
   I18n?: unknown;
+  /** CSS do módulo; com `isolate` é injetado dentro do shadow root. */
+  styles?: string[];
 }
 
 export interface ModularizeOptions {
   appName: string;
   I18n?: unknown;
+  /**
+   * CSS do módulo como texto. Com `<Module isolate />` é injetado no shadow root,
+   * já que `<style>` colocado em document.head não alcança o Shadow DOM.
+   */
+  styles?: string | string[];
   /** Callback padrão para falhas críticas capturadas pelo ErrorBoundary. */
   onCriticalFailure?: (error: Error) => void;
 }

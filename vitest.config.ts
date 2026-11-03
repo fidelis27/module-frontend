@@ -6,5 +6,6 @@ export default defineConfig({
     environment: 'jsdom',
     environmentMatchGlobs: [['tests/server/**', 'node'], ['tests/e2e/**', 'node']],
     globals: false,
+    exclude: ['node_modules/**', 'tests/browser/**'],
   },
 });

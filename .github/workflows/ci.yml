@@ -16,3 +16,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Isolamento de CSS em browser real
+        run: npm run test:browser
+        env:
+          CHROMIUM_PATH: /usr/bin/google-chrome
