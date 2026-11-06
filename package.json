@@ -1,7 +1,7 @@
 {
   "name": "@lib-core-mfe/module-frontend",
-  "version": "0.1.0",
-  "description": "Remote modules para micro-frontends via manifesto dinâmico e registro global na window (sem Module Federation).",
+  "version": "0.2.0",
+  "description": "React micro-frontends with manifest-based remote module loading and a global browser registry.",
   "license": "MIT",
   "repository": {
     "type": "git",
