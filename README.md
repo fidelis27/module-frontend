@@ -77,6 +77,21 @@ Cuidados:
 - **Isolamento de CSS:** só com `<Module isolate />` (veja acima).
 - **Falhas:** erro de rede, timeout, módulo ausente e erro de render chegam em `onError`; falhas não ficam em cache.
 
+## Compatibilidade do contrato
+
+Provider e Consumer verificam a versão do contrato antes de montar o módulo. Um
+contrato ausente ou diferente resulta em erro explícito e chega ao `onError` do
+Consumer.
+
+| Versão da biblioteca | Contrato | Compatibilidade |
+| --- | ---: | --- |
+| `0.1.x` | Não declarado | Rejeitado por Consumers com validação de contrato |
+| `0.2.x` | `1` | Compatível com outros módulos de contrato `1` |
+
+Ao alterar incompativelmente a entry global ou o manifesto, incremente a
+`CONTRACT_VERSION`. Atualize Provider e Consumer juntos; consulte
+[ADR 0003](./docs/adr/0003-contract-version.md).
+
 ## Desenvolvimento
 
 ```
