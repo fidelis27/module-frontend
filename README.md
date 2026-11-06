@@ -39,6 +39,10 @@ import { Module } from '@lib-core-mfe/module-frontend/client';
   allowedHosts={['https://provider.example.com']}
   entityId="42"
   onActionEvent={(e) => console.log(e)}
+  manifestTtlMs={60_000}
+  onUpdateAvailable={({ previous, current }) => {
+    console.info(`Nova versão disponível: ${previous} → ${current}`);
+  }}
   loading={<Spinner />}
   fallback={<Unavailable />}
   onError={report}
@@ -88,9 +92,23 @@ Consumer.
 | `0.1.x` | Não declarado | Rejeitado por Consumers com validação de contrato |
 | `0.2.x` | `1` | Compatível com outros módulos de contrato `1` |
 
-Ao alterar incompativelmente a entry global ou o manifesto, incremente a
+Ao alterar a entry global ou o manifesto de forma incompatível, incremente a
 `CONTRACT_VERSION`. Atualize Provider e Consumer juntos; consulte
 [ADR 0003](./docs/adr/0003-contract-version.md).
+
+## Cache e atualização
+
+O manifesto fica em cache por 60 segundos por padrão. O Consumer revalida
+enquanto o módulo permanece montado e chama `onUpdateAvailable` uma vez para
+cada nova versão detectada, com `{ previous, current }`. `manifestTtlMs={0}`
+desativa o cache e o polling automático; uma chamada posterior a `loadModule`
+sempre revalida.
+
+Uma versão recém-publicada **não substitui o módulo já montado**. O registro
+global usa a política *first registration wins*: carregar e montar duas versões
+do mesmo módulo na mesma página pode misturar contextos e corromper o estado do
+React. Use o callback para decidir quando recarregar a página; a versão nova
+entra após o reload. Consulte [ADR 0004](./docs/adr/0004-cache-and-versioning.md).
 
 ## Desenvolvimento
 

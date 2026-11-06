@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 - Implement `moduleLifeCycleEvent.onMounted`, called once after the remote
   component commits and suppressed if rendering fails.
 - Add a Provider/Consumer contract version to the manifest and remote entry.
+- Revalidate manifests every 60 seconds by default and notify hosts when a new
+  Provider version is available without replacing the mounted module.
 
 ### Breaking Changes
 
