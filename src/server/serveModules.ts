@@ -3,7 +3,11 @@ import { createReadStream } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
-import { DEFAULT_BASE_PATH, ENDPOINTS } from "../shared/constants";
+import {
+  CONTRACT_VERSION,
+  DEFAULT_BASE_PATH,
+  ENDPOINTS,
+} from "../shared/constants";
 import type { Manifest } from "../shared/types";
 
 export interface ServeModulesOptions {
@@ -74,7 +78,12 @@ export function serveModules(options: ServeModulesOptions): ModulesMiddleware {
       hashes.push(`${file}:${info.hash}`);
     }
 
-    return { appName, version: sha(hashes.join("|")), modules };
+    return {
+      contractVersion: CONTRACT_VERSION,
+      appName,
+      version: sha(hashes.join("|")),
+      modules,
+    };
   }
 
   function applyCors(req: IncomingMessage, res: ServerResponse) {

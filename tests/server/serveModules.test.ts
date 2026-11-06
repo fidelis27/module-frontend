@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { serveModules } from "../../src/server";
+import { CONTRACT_VERSION } from "../../src/shared";
 
 let dir: string;
 let server: http.Server;
@@ -72,6 +73,7 @@ describe("serveModules", () => {
     expect(res.headers["cache-control"]).toBe("no-cache");
 
     const manifest = JSON.parse(res.body);
+    expect(manifest.contractVersion).toBe(CONTRACT_VERSION);
     expect(manifest.appName).toBe("shop");
     expect(manifest.version).toMatch(/^[0-9a-f]{10}$/);
     expect(Object.keys(manifest.modules)).toEqual(["cart"]);

@@ -1,4 +1,5 @@
 export const REMOTE_MODULE_KEY = "__REMOTE_MODULE__";
+export const CONTRACT_VERSION = 1;
 
 export const ENDPOINTS = {
   modulesConfiguration: "/__modules_configuration",

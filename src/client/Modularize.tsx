@@ -1,6 +1,6 @@
 import { createElement, useEffect, useRef, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
-import { getRegistryKey } from "../shared/constants";
+import { CONTRACT_VERSION, getRegistryKey } from "../shared/constants";
 import type {
   ModularizeOptions,
   ModuleLifeCycleEvent,
@@ -81,6 +81,7 @@ export function Modularize<P extends object = Record<string, unknown>>(
   Wrapped.displayName = `Modularized(${name})`;
 
   const entry: RemoteModuleEntry<P> = {
+    contractVersion: CONTRACT_VERSION,
     appName,
     name,
     createRoot,

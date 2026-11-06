@@ -1,4 +1,8 @@
-import { DEFAULT_MANIFEST_PATH, getRegistryKey } from "../shared/constants";
+import {
+  CONTRACT_VERSION,
+  DEFAULT_MANIFEST_PATH,
+  getRegistryKey,
+} from "../shared/constants";
 import type { Manifest, RemoteModuleEntry } from "../shared/types";
 
 export interface LoadModuleOptions {
@@ -62,6 +66,61 @@ function assertOriginAllowed(
   );
 }
 
+function assertContractVersion(actual: unknown, name: string, source: string) {
+  if (actual === CONTRACT_VERSION) return;
+  const found = actual === undefined ? "ausente" : String(actual);
+  throw new Error(
+    `Contrato incompatível para "${name}": versão ${found} no ${source}; ` +
+      `este consumer suporta ${CONTRACT_VERSION}. Atualize @lib-core-mfe/module-frontend ` +
+      `no Provider e no Consumer para versões compatíveis.`,
+  );
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isValidEntry<P>(
+  value: unknown,
+  appName: string,
+  name: string,
+): value is RemoteModuleEntry<P> {
+  if (!isObject(value)) return false;
+  const component = value.Component;
+  const isComponent =
+    typeof component === "function" ||
+    (typeof component === "object" && component !== null);
+  const context = value.ModuleContext;
+  const isContext = isObject(context) && "Provider" in context;
+  return (
+    value.contractVersion === CONTRACT_VERSION &&
+    value.appName === appName &&
+    value.name === name &&
+    typeof value.createRoot === "function" &&
+    typeof value.createElement === "function" &&
+    isContext &&
+    isComponent
+  );
+}
+
+function validateEntry<P>(
+  value: unknown,
+  appName: string,
+  name: string,
+): RemoteModuleEntry<P> {
+  if (!isObject(value)) {
+    throw new Error(`Entry do módulo "${name}" está malformada.`);
+  }
+  assertContractVersion(value.contractVersion, name, "entry");
+
+  if (!isValidEntry<P>(value, appName, name)) {
+    throw new Error(
+      `Entry do módulo "${name}" está malformada ou não corresponde ao app "${appName}".`,
+    );
+  }
+  return value;
+}
+
 function fetchManifest(url: URL, fetchImpl: typeof fetch): Promise<Manifest> {
   const key = url.href;
   const cached = manifestCache.get(key);
@@ -122,6 +181,13 @@ export async function loadModule<P = Record<string, unknown>>(
 
   const run = async (): Promise<RemoteModuleEntry<P>> => {
     const manifest = await fetchManifest(manifestUrl, fetchImpl);
+    if (!manifest || typeof manifest !== "object") {
+      throw new Error(`Manifesto inválido em ${manifestUrl.origin}`);
+    }
+    assertContractVersion(manifest.contractVersion, name, "manifesto");
+    if (typeof manifest.appName !== "string") {
+      throw new Error(`Manifesto sem appName válido em ${manifestUrl.origin}`);
+    }
     const mod = manifest.modules[name];
     if (!mod) {
       throw new Error(
@@ -138,7 +204,7 @@ export async function loadModule<P = Record<string, unknown>>(
 
     const entry = (window as unknown as Record<string, unknown>)[
       getRegistryKey(manifest.appName, name)
-    ] as RemoteModuleEntry<P> | undefined;
+    ];
 
     if (!entry) {
       throw new Error(
@@ -146,7 +212,7 @@ export async function loadModule<P = Record<string, unknown>>(
           `Confira se o appName do Modularize é "${manifest.appName}".`,
       );
     }
-    return entry;
+    return validateEntry<P>(entry, manifest.appName, name);
   };
 
   return withTimeout(run(), timeoutMs, `carregar o módulo "${name}"`);

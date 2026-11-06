@@ -2,6 +2,7 @@ import { act } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Modularize, Module, resetModuleCaches } from "../../src/client";
+import { CONTRACT_VERSION, getRegistryKey } from "../../src/shared";
 
 const HOST = "https://provider.example.com";
 const MANIFEST_URL = `${HOST}/modules/__modules_configuration`;
@@ -42,6 +43,7 @@ function stubManifest(manifest: unknown, status = 200) {
 }
 
 const manifest = {
+  contractVersion: CONTRACT_VERSION,
   appName: "shop",
   version: "v1",
   modules: {
@@ -71,6 +73,32 @@ afterEach(() => {
 });
 
 describe("<Module />", () => {
+  it("rejeita manifestos sem contrato ou com versão incompatível", async () => {
+    for (const contractVersion of [undefined, CONTRACT_VERSION + 1]) {
+      resetModuleCaches();
+      const onError = vi.fn();
+      const loaded = stubScripts({});
+      stubManifest({ ...manifest, contractVersion });
+
+      const view = render(
+        <Module
+          name="cart"
+          host={HOST}
+          path="/modules/__modules_configuration"
+          allowedHosts={[HOST]}
+          onError={onError}
+        />,
+      );
+      await waitFor(() => expect(onError).toHaveBeenCalled());
+      expect(onError.mock.calls[0]![0].message).toMatch(
+        /Contrato incompatível/,
+      );
+      expect(loaded).toHaveLength(0);
+      view.unmount();
+      vi.restoreAllMocks();
+    }
+  });
+
   it("carrega manifesto + script e monta o componente remoto com as props", async () => {
     const fetchMock = stubManifest(manifest);
     const loaded = stubScripts({ "cart.js": registerCart });
@@ -226,6 +254,66 @@ describe("<Module />", () => {
     );
     await waitFor(() => expect(onError).toHaveBeenCalled());
     expect(onError.mock.calls[0]![0].message).toMatch(/não se registrou/);
+  });
+
+  it("rejeita entries sem versão ou com contrato incompatível", async () => {
+    for (const contractVersion of [undefined, CONTRACT_VERSION + 1]) {
+      resetModuleCaches();
+      const register = () => {
+        const validEntry = Modularize("cart", () => null, {
+          appName: "shop",
+        });
+        const entry = validEntry as unknown as Record<string, unknown>;
+        if (contractVersion === undefined) delete entry.contractVersion;
+        else entry.contractVersion = contractVersion;
+      };
+      const onError = vi.fn();
+      stubManifest(manifest);
+      stubScripts({ "cart.js": register });
+
+      const view = render(
+        <Module
+          name="cart"
+          host={HOST}
+          path="/modules/__modules_configuration"
+          allowedHosts={[HOST]}
+          onError={onError}
+        />,
+      );
+      await waitFor(() => expect(onError).toHaveBeenCalled());
+      expect(onError.mock.calls[0]![0].message).toMatch(
+        /Contrato incompatível/,
+      );
+      view.unmount();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("rejeita uma entry malformada antes de montá-la", async () => {
+    const onError = vi.fn();
+    stubManifest(manifest);
+    stubScripts({
+      "cart.js": () => {
+        const validEntry = Modularize("cart", () => null, { appName: "shop" });
+        const registry = window as unknown as Record<string, unknown>;
+        registry[getRegistryKey("shop", "cart")] = {
+          ...validEntry,
+          createRoot: undefined,
+        };
+      },
+    });
+
+    render(
+      <Module
+        name="cart"
+        host={HOST}
+        path="/modules/__modules_configuration"
+        allowedHosts={[HOST]}
+        onError={onError}
+      />,
+    );
+    await waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(onError.mock.calls[0]![0].message).toMatch(/malformada/);
   });
 
   it("bloqueia origens fora da allowlist sem nem buscar o manifesto", async () => {

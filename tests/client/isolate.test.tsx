@@ -7,10 +7,12 @@ import {
   ModuleContext,
   resetModuleCaches,
 } from "../../src/client";
+import { CONTRACT_VERSION } from "../../src/shared";
 
 const HOST = "https://provider.example.com";
 const PATH = "/modules/__modules_configuration";
 const manifest = {
+  contractVersion: CONTRACT_VERSION,
   appName: "shop",
   version: "v1",
   modules: { cart: { name: "cart", scripts: ["/modules/cart.js?v=abc"] } },

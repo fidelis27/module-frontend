@@ -8,6 +8,8 @@ export interface ManifestModule {
 }
 
 export interface Manifest {
+  /** Version of the Provider/Consumer runtime contract. */
+  contractVersion: number;
   appName: string;
   /** Hash agregado dos bundles; muda a cada deploy com conteúdo novo. */
   version: string;
@@ -30,6 +32,7 @@ export interface ModuleContextValue {
 
 /** Objeto que o Provider registra na window. */
 export interface RemoteModuleEntry<P = Record<string, unknown>> {
+  contractVersion: number;
   appName: string;
   name: string;
   createRoot: (container: Element | DocumentFragment) => Root;
