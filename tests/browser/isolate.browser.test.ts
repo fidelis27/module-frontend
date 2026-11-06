@@ -15,6 +15,7 @@ import { build } from "esbuild";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { serveModules } from "../../src/server";
+import { CONTRACT_VERSION } from "../../src/shared";
 
 const SRC = path.resolve(__dirname, "../../src");
 const CHROMIUM =
@@ -52,6 +53,7 @@ const PAGE = `<!doctype html>
   <h1 id="host-h1">host title</h1>
   <div id="plain"></div>
   <div id="isolated"></div>
+  <div id="integrity"></div>
   <script src="/consumer.js"></script>
 </body></html>`;
 
@@ -83,7 +85,17 @@ beforeAll(async () => {
      import { Module } from './client';
      const common = { name: 'widget', host: location.origin, allowedHosts: [location.origin] };
      createRoot(document.getElementById('plain')!).render(<Module {...common} />);
-     createRoot(document.getElementById('isolated')!).render(<Module {...common} isolate />);`,
+     createRoot(document.getElementById('isolated')!).render(<Module {...common} isolate />);
+     createRoot(document.getElementById('integrity')!).render(
+       <Module
+         name="widget"
+         host={location.origin}
+         path="/bad-manifest"
+         allowedHosts={[location.origin]}
+         requireIntegrity
+         fallback={<span id="integrity-failed">blocked</span>}
+       />,
+     );`,
     consumerJs,
   );
 
@@ -96,6 +108,23 @@ beforeAll(async () => {
     if (req.url === "/consumer.js") {
       res.setHeader("Content-Type", "application/javascript");
       return void res.end(await readFile(consumerJs));
+    }
+    if (req.url === "/bad-manifest") {
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      return void res.end(
+        JSON.stringify({
+          contractVersion: CONTRACT_VERSION,
+          appName: "shop",
+          version: "tampered",
+          modules: {
+            widget: {
+              name: "widget",
+              scripts: ["/modules/widget.js"],
+              integrity: [`sha384-${"A".repeat(64)}`],
+            },
+          },
+        }),
+      );
     }
     return modules(req, res, () => {
       res.statusCode = 404;
@@ -221,5 +250,12 @@ run("isolate em Chromium real", () => {
         ).textContent,
     );
     expect(text).toBe("module text");
+  });
+
+  it("o browser bloqueia scripts cujo conteúdo não confere com o hash SRI", async () => {
+    await page.waitForSelector("#integrity-failed");
+    expect(await page.locator("#integrity-failed").textContent()).toBe(
+      "blocked",
+    );
   });
 });

@@ -28,6 +28,10 @@ export interface LoadModuleOptions {
   manifestTtlMs?: number;
   /** Chamado uma vez para cada nova versão encontrada após a primeira. */
   onUpdateAvailable?: (update: ModuleUpdateAvailable) => void;
+  /** CSP nonce aplicado aos scripts remotos. */
+  nonce?: string;
+  /** Rejeita manifestos sem hashes SRI para todos os scripts do módulo. */
+  requireIntegrity?: boolean;
   fetchImpl?: typeof fetch;
 }
 
@@ -190,19 +194,26 @@ function fetchManifest(
   return promise;
 }
 
-function loadScript(url: URL): Promise<void> {
-  const key = url.href;
+function loadScript(
+  url: URL,
+  integrity?: string,
+  nonce?: string,
+): Promise<void> {
+  const key = `${url.href}\0${integrity ?? ""}`;
   const cached = scriptCache.get(key);
   if (cached) return cached;
 
   const promise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = key;
+    script.src = url.href;
     script.async = true;
+    script.crossOrigin = "anonymous";
+    if (integrity) script.integrity = integrity;
+    if (nonce) script.nonce = nonce;
     script.onload = () => resolve();
     script.onerror = () => {
       script.remove();
-      reject(new Error(`Falha ao carregar script ${key}`));
+      reject(new Error(`Falha ao carregar script ${url.href}`));
     };
     document.head.appendChild(script);
   });
@@ -223,6 +234,8 @@ export async function loadModule<P = Record<string, unknown>>(
     timeoutMs = 15000,
     manifestTtlMs = DEFAULT_MANIFEST_TTL_MS,
     onUpdateAvailable,
+    nonce,
+    requireIntegrity = false,
     fetchImpl = fetch,
   } = options;
   if (!Number.isFinite(manifestTtlMs) || manifestTtlMs < 0) {
@@ -286,13 +299,43 @@ export async function loadModule<P = Record<string, unknown>>(
         `Módulo "${name}" não existe no manifesto de ${manifestUrl.origin}`,
       );
     }
+    if (
+      !Array.isArray(mod.scripts) ||
+      mod.scripts.length === 0 ||
+      mod.scripts.some((script) => typeof script !== "string")
+    ) {
+      throw new Error(`Manifesto contém scripts inválidos para "${name}"`);
+    }
+    if (
+      mod.integrity !== undefined &&
+      (!Array.isArray(mod.integrity) ||
+        mod.integrity.length !== mod.scripts.length ||
+        mod.integrity.some(
+          (hash) => typeof hash !== "string" || hash.trim() === "",
+        ))
+    ) {
+      throw new Error(`Manifesto contém hashes SRI inválidos para "${name}"`);
+    }
+    if (
+      requireIntegrity &&
+      (!mod.integrity || mod.integrity.length !== mod.scripts.length)
+    ) {
+      throw new Error(
+        `O módulo "${name}" não fornece hashes SRI para todos os scripts; ` +
+          `desative requireIntegrity somente se confiar no Provider.`,
+      );
+    }
 
     const scriptUrls = mod.scripts.map((s) => {
       const url = new URL(s, manifestUrl);
       assertOriginAllowed(url, allowedHosts);
       return url;
     });
-    await Promise.all(scriptUrls.map(loadScript));
+    await Promise.all(
+      scriptUrls.map((url, index) =>
+        loadScript(url, mod.integrity?.[index], nonce),
+      ),
+    );
 
     const entry = (window as unknown as Record<string, unknown>)[
       getRegistryKey(manifest.appName, name)

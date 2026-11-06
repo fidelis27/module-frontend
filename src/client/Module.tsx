@@ -23,6 +23,10 @@ export interface ModuleProps {
   manifestTtlMs?: number;
   /** Chamado quando o Provider publica uma nova versão; o módulo atual não é trocado. */
   onUpdateAvailable?: (update: ModuleUpdateAvailable) => void;
+  /** CSP nonce aplicado aos scripts e estilos do módulo. */
+  nonce?: string;
+  /** Rejeita o módulo se o manifesto não contiver SRI para cada script. */
+  requireIntegrity?: boolean;
   /**
    * Monta o módulo dentro de um Shadow DOM: o CSS do host não entra no módulo
    * e o do módulo não vaza para o host. Estilos do módulo precisam ser
@@ -52,6 +56,8 @@ export function Module(props: ModuleProps) {
     timeoutMs,
     manifestTtlMs = 60_000,
     onUpdateAvailable,
+    nonce,
+    requireIntegrity,
     isolate = false,
     loading = null,
     fallback = null,
@@ -70,8 +76,12 @@ export function Module(props: ModuleProps) {
   onErrorRef.current = onError;
   const onUpdateAvailableRef = useRef(onUpdateAvailable);
   onUpdateAvailableRef.current = onUpdateAvailable;
+  const allowedHostsRef = useRef(allowedHosts);
+  allowedHostsRef.current = allowedHosts;
+  const nonceRef = useRef(nonce);
+  nonceRef.current = nonce;
 
-  const allowedKey = allowedHosts?.join(",");
+  const allowedKey = JSON.stringify(allowedHosts);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,10 +92,12 @@ export function Module(props: ModuleProps) {
       host,
       name,
       path,
-      allowedHosts,
+      allowedHosts: allowedHostsRef.current,
       timeoutMs,
       manifestTtlMs,
       onUpdateAvailable: onUpdateAvailableRef.current,
+      nonce,
+      requireIntegrity,
     }).then(
       (loaded) => {
         if (!cancelled) setEntry(loaded);
@@ -101,9 +113,16 @@ export function Module(props: ModuleProps) {
     return () => {
       cancelled = true;
     };
-    // allowedHosts entra via allowedKey para não re-disparar a cada render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host, name, path, allowedKey, timeoutMs, manifestTtlMs]);
+  }, [
+    host,
+    name,
+    path,
+    allowedKey,
+    timeoutMs,
+    manifestTtlMs,
+    nonce,
+    requireIntegrity,
+  ]);
 
   useEffect(() => {
     if (!entry || manifestTtlMs === 0) return;
@@ -116,10 +135,12 @@ export function Module(props: ModuleProps) {
           host,
           name,
           path,
-          allowedHosts,
+          allowedHosts: allowedHostsRef.current,
           timeoutMs,
           manifestTtlMs,
           onUpdateAvailable: onUpdateAvailableRef.current,
+          nonce,
+          requireIntegrity,
         });
       } catch (err) {
         if (!cancelled) {
@@ -137,7 +158,17 @@ export function Module(props: ModuleProps) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [entry, host, name, path, allowedKey, timeoutMs, manifestTtlMs]);
+  }, [
+    entry,
+    host,
+    name,
+    path,
+    allowedKey,
+    timeoutMs,
+    manifestTtlMs,
+    nonce,
+    requireIntegrity,
+  ]);
 
   // Cria/destrói a raiz isolada quando o módulo carrega (ou quando `isolate` muda).
   useEffect(() => {
@@ -163,10 +194,12 @@ export function Module(props: ModuleProps) {
 
       const base = document.createElement("style");
       base.textContent = SHADOW_BASE_CSS;
+      if (nonceRef.current) base.nonce = nonceRef.current;
       shadow.appendChild(base);
       for (const css of entry.styles ?? []) {
         const style = document.createElement("style");
         style.textContent = css;
+        if (nonceRef.current) style.nonce = nonceRef.current;
         shadow.appendChild(style);
       }
       mountPoint = document.createElement("div");

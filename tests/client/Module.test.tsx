@@ -242,6 +242,26 @@ describe("<Module />", () => {
     );
   });
 
+  it("rejeita manifestos sem SRI quando requireIntegrity está ativo", async () => {
+    const onError = vi.fn();
+    const loaded = stubScripts({});
+    stubManifest(manifest);
+
+    render(
+      <Module
+        name="cart"
+        host={HOST}
+        path="/modules/__modules_configuration"
+        allowedHosts={[HOST]}
+        requireIntegrity
+        onError={onError}
+      />,
+    );
+    await waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(onError.mock.calls[0]![0].message).toMatch(/não fornece hashes SRI/);
+    expect(loaded).toHaveLength(0);
+  });
+
   it("permite tentar de novo depois de uma falha (erro não fica em cache)", async () => {
     stubManifest(manifest);
     const loaded = stubScripts({ "cart.js": "fail" });

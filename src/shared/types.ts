@@ -5,6 +5,8 @@ export interface ManifestModule {
   name: string;
   /** URLs dos scripts; podem ser relativas ao host do Provider. */
   scripts: string[];
+  /** SRI hashes alinhados por índice com `scripts`. */
+  integrity?: string[];
 }
 
 export interface Manifest {

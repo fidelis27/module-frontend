@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
@@ -71,6 +72,7 @@ describe("serveModules", () => {
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(/application\/json/);
     expect(res.headers["cache-control"]).toBe("no-cache");
+    expect(res.headers["x-content-type-options"]).toBe("nosniff");
 
     const manifest = JSON.parse(res.body);
     expect(manifest.contractVersion).toBe(CONTRACT_VERSION);
@@ -80,6 +82,9 @@ describe("serveModules", () => {
     expect(manifest.modules.cart.scripts[0]).toMatch(
       /^\/modules\/cart\.js\?v=[0-9a-f]{10}$/,
     );
+    expect(manifest.modules.cart.integrity).toEqual([
+      `sha384-${createHash("sha384").update("window.cart = 1;").digest("base64")}`,
+    ]);
   });
 
   it("serve o bundle com cache imutável quando tem ?v= e revalida quando não tem", async () => {
@@ -90,6 +95,7 @@ describe("serveModules", () => {
     expect(versioned.status).toBe(200);
     expect(versioned.body).toBe("window.cart = 1;");
     expect(versioned.headers["content-type"]).toMatch(/javascript/);
+    expect(versioned.headers["x-content-type-options"]).toBe("nosniff");
     expect(versioned.headers["cache-control"]).toMatch(/immutable/);
 
     const plain = await raw("/modules/cart.js");

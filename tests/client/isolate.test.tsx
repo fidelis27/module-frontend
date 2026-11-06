@@ -111,6 +111,22 @@ describe("<Module isolate />", () => {
     );
   });
 
+  it("aplica o CSP nonce aos estilos do Shadow DOM", async () => {
+    stub(registerCart("b{font-weight:700}"));
+    const { container } = render(
+      <Module {...common} isolate nonce="csp-token" />,
+    );
+    await waitFor(() =>
+      expect(
+        hostEl(container).shadowRoot?.querySelector('[data-testid="cart"]'),
+      ).toBeTruthy(),
+    );
+
+    const styles = [...hostEl(container).shadowRoot!.querySelectorAll("style")];
+    expect(styles).toHaveLength(2);
+    expect(styles.every((style) => style.nonce === "csp-token")).toBe(true);
+  });
+
   it("seletores do documento não alcançam o módulo (e vice-versa)", async () => {
     stub(registerCart());
     const hostStyle = document.createElement("style");

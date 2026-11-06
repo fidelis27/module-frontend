@@ -32,19 +32,29 @@ interface FileInfo {
   mtimeMs: number;
   size: number;
   hash: string;
+  integrity: string;
 }
 
 function sha(input: string | Buffer): string {
   return createHash("sha1").update(input).digest("hex").slice(0, 10);
 }
 
-function hashFile(file: string): Promise<string> {
+function hashFile(file: string): Promise<{ hash: string; integrity: string }> {
   return new Promise((resolve, reject) => {
-    const h = createHash("sha1");
+    const versionHash = createHash("sha1");
+    const integrityHash = createHash("sha384");
     createReadStream(file)
-      .on("data", (chunk) => h.update(chunk))
+      .on("data", (chunk) => {
+        versionHash.update(chunk);
+        integrityHash.update(chunk);
+      })
       .on("error", reject)
-      .on("end", () => resolve(h.digest("hex").slice(0, 10)));
+      .on("end", () =>
+        resolve({
+          hash: versionHash.digest("hex").slice(0, 10),
+          integrity: `sha384-${integrityHash.digest("base64")}`,
+        }),
+      );
   });
 }
 
@@ -66,15 +76,20 @@ export function serveModules(options: ServeModulesOptions): ModulesMiddleware {
       const st = await stat(full);
       let info = fileCache.get(file);
       if (!info || info.mtimeMs !== st.mtimeMs || info.size !== st.size) {
+        const hashes = await hashFile(full);
         info = {
           mtimeMs: st.mtimeMs,
           size: st.size,
-          hash: await hashFile(full),
+          ...hashes,
         };
         fileCache.set(file, info);
       }
       const name = file.slice(0, -".js".length);
-      modules[name] = { name, scripts: [`${basePath}/${file}?v=${info.hash}`] };
+      modules[name] = {
+        name,
+        scripts: [`${basePath}/${file}?v=${info.hash}`],
+        integrity: [info.integrity],
+      };
       hashes.push(`${file}:${info.hash}`);
     }
 
@@ -132,6 +147,7 @@ export function serveModules(options: ServeModulesOptions): ModulesMiddleware {
         const manifest = await buildManifest();
         res.statusCode = 200;
         res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("Cache-Control", "no-cache");
         res.end(method === "HEAD" ? undefined : JSON.stringify(manifest));
         return;
@@ -163,6 +179,9 @@ export function serveModules(options: ServeModulesOptions): ModulesMiddleware {
           ? "application/json; charset=utf-8"
           : "application/javascript; charset=utf-8",
       );
+      if (full.endsWith(".js")) {
+        res.setHeader("X-Content-Type-Options", "nosniff");
+      }
       // Com ?v=<hash> o conteúdo é imutável; sem ele, sempre revalidar.
       res.setHeader(
         "Cache-Control",

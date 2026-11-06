@@ -4,13 +4,17 @@ import { CONTRACT_VERSION, getRegistryKey } from "../../src/shared";
 
 const HOST = "https://provider.example.com";
 
-function manifest(version: string) {
+function manifest(version: string, integrity?: string[]) {
   return {
     contractVersion: CONTRACT_VERSION,
     appName: "shop",
     version,
     modules: {
-      cart: { name: "cart", scripts: [`/modules/cart.js?v=${version}`] },
+      cart: {
+        name: "cart",
+        scripts: [`/modules/cart.js?v=${version}`],
+        ...(integrity ? { integrity } : {}),
+      },
     },
   };
 }
@@ -24,11 +28,11 @@ function fetchResponse(value: unknown): Response {
 }
 
 function stubScript() {
-  const loaded: string[] = [];
+  const loaded: HTMLScriptElement[] = [];
   vi.spyOn(document.head, "appendChild").mockImplementation(((node: Node) => {
     const script = node as HTMLScriptElement;
     if (script.tagName === "SCRIPT") {
-      loaded.push(script.src);
+      loaded.push(script);
       queueMicrotask(() => {
         Modularize("cart", () => null, { appName: "shop" });
         script.onload?.(new Event("load"));
@@ -121,5 +125,43 @@ describe("loadModule manifest revalidation", () => {
       }),
     ).rejects.toThrow(/Timeout/);
     expect(signal?.aborted).toBe(true);
+  });
+
+  it("applies cross-origin, CSP nonce, and SRI attributes to remote scripts", async () => {
+    const integrity = `sha384-${"A".repeat(64)}`;
+    const fetchImpl = vi.fn(async () =>
+      fetchResponse(manifest("v1", [integrity])),
+    );
+    const scripts = stubScript();
+
+    await loadModule({
+      host: HOST,
+      name: "cart",
+      allowedHosts: [HOST],
+      nonce: "csp-token",
+      requireIntegrity: true,
+      fetchImpl,
+    });
+
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]!.crossOrigin).toBe("anonymous");
+    expect(scripts[0]!.nonce).toBe("csp-token");
+    expect(scripts[0]!.integrity).toBe(integrity);
+  });
+
+  it("rejects a module without SRI when integrity is required", async () => {
+    const fetchImpl = vi.fn(async () => fetchResponse(manifest("v1")));
+    const scripts = stubScript();
+
+    await expect(
+      loadModule({
+        host: HOST,
+        name: "cart",
+        allowedHosts: [HOST],
+        requireIntegrity: true,
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/não fornece hashes SRI/);
+    expect(scripts).toHaveLength(0);
   });
 });
