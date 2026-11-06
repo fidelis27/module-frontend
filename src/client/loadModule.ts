@@ -3,7 +3,13 @@ import {
   DEFAULT_MANIFEST_PATH,
   getRegistryKey,
 } from "../shared/constants";
-import type { Manifest, RemoteModuleEntry } from "../shared/types";
+import type {
+  Manifest,
+  ModuleUpdateAvailable,
+  RemoteModuleEntry,
+} from "../shared/types";
+
+const DEFAULT_MANIFEST_TTL_MS = 60_000;
 
 export interface LoadModuleOptions {
   /** Origem do Provider, ex.: https://provider.example.com */
@@ -18,28 +24,46 @@ export interface LoadModuleOptions {
   allowedHosts?: string[];
   /** Tempo máximo para manifesto + scripts, em ms. */
   timeoutMs?: number;
+  /** Tempo de cache do manifesto. `0` sempre revalida ao chamar `loadModule`. */
+  manifestTtlMs?: number;
+  /** Chamado uma vez para cada nova versão encontrada após a primeira. */
+  onUpdateAvailable?: (update: ModuleUpdateAvailable) => void;
   fetchImpl?: typeof fetch;
 }
 
-const manifestCache = new Map<string, Promise<Manifest>>();
+interface ManifestCacheEntry {
+  promise: Promise<Manifest>;
+  fetchedAt: number;
+  pending: boolean;
+}
+
+interface VersionObservation {
+  initialVersion: string;
+  notifiedVersions: Set<string>;
+}
+
+const manifestCache = new Map<string, ManifestCacheEntry>();
 const scriptCache = new Map<string, Promise<void>>();
+const versionObservations = new Map<string, VersionObservation>();
 
 /** Limpa caches internos (útil em testes e em reload forçado). */
 export function resetModuleCaches(): void {
   manifestCache.clear();
   scriptCache.clear();
+  versionObservations.clear();
 }
 
 function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
   label: string,
+  onTimeout?: () => void,
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`Timeout (${ms}ms) ao ${label}`)),
-      ms,
-    );
+    const timer = setTimeout(() => {
+      onTimeout?.();
+      reject(new Error(`Timeout (${ms}ms) ao ${label}`));
+    }, ms);
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -121,13 +145,24 @@ function validateEntry<P>(
   return value;
 }
 
-function fetchManifest(url: URL, fetchImpl: typeof fetch): Promise<Manifest> {
+function fetchManifest(
+  url: URL,
+  fetchImpl: typeof fetch,
+  manifestTtlMs: number,
+  signal: AbortSignal,
+): Promise<Manifest> {
   const key = url.href;
   const cached = manifestCache.get(key);
-  if (cached) return cached;
+  if (
+    cached &&
+    (cached.pending ||
+      (manifestTtlMs > 0 && Date.now() - cached.fetchedAt < manifestTtlMs))
+  ) {
+    return cached.promise;
+  }
 
   const promise = (async () => {
-    const response = await fetchImpl(key, { credentials: "omit" });
+    const response = await fetchImpl(key, { credentials: "omit", signal });
     if (!response.ok) {
       throw new Error(
         `Falha ao buscar manifesto (${response.status}) em ${key}`,
@@ -136,9 +171,22 @@ function fetchManifest(url: URL, fetchImpl: typeof fetch): Promise<Manifest> {
     return (await response.json()) as Manifest;
   })();
 
-  manifestCache.set(key, promise);
+  const entry: ManifestCacheEntry = {
+    promise,
+    fetchedAt: Date.now(),
+    pending: true,
+  };
+  manifestCache.set(key, entry);
+  promise.then(
+    () => {
+      entry.fetchedAt = Date.now();
+      entry.pending = false;
+    },
+    () => {
+      if (manifestCache.get(key) === entry) manifestCache.delete(key);
+    },
+  );
   // Falhas não podem ficar em cache: o próximo mount precisa poder tentar de novo.
-  promise.catch(() => manifestCache.delete(key));
   return promise;
 }
 
@@ -173,14 +221,27 @@ export async function loadModule<P = Record<string, unknown>>(
     path = DEFAULT_MANIFEST_PATH,
     allowedHosts,
     timeoutMs = 15000,
+    manifestTtlMs = DEFAULT_MANIFEST_TTL_MS,
+    onUpdateAvailable,
     fetchImpl = fetch,
   } = options;
+  if (!Number.isFinite(manifestTtlMs) || manifestTtlMs < 0) {
+    throw new Error(
+      "manifestTtlMs deve ser um número finito maior ou igual a 0",
+    );
+  }
 
   const manifestUrl = new URL(path, host);
   assertOriginAllowed(manifestUrl, allowedHosts);
+  const controller = new AbortController();
 
   const run = async (): Promise<RemoteModuleEntry<P>> => {
-    const manifest = await fetchManifest(manifestUrl, fetchImpl);
+    const manifest = await fetchManifest(
+      manifestUrl,
+      fetchImpl,
+      manifestTtlMs,
+      controller.signal,
+    );
     if (!manifest || typeof manifest !== "object") {
       throw new Error(`Manifesto inválido em ${manifestUrl.origin}`);
     }
@@ -188,6 +249,37 @@ export async function loadModule<P = Record<string, unknown>>(
     if (typeof manifest.appName !== "string") {
       throw new Error(`Manifesto sem appName válido em ${manifestUrl.origin}`);
     }
+    if (typeof manifest.version !== "string" || !isObject(manifest.modules)) {
+      throw new Error(`Manifesto inválido em ${manifestUrl.origin}`);
+    }
+
+    const versionKey = JSON.stringify([manifestUrl.origin, manifest.appName]);
+    let observation = versionObservations.get(versionKey);
+    if (!observation) {
+      observation = {
+        initialVersion: manifest.version,
+        notifiedVersions: new Set(),
+      };
+      versionObservations.set(versionKey, observation);
+    } else if (manifest.version !== observation.initialVersion) {
+      if (
+        onUpdateAvailable &&
+        !observation.notifiedVersions.has(manifest.version)
+      ) {
+        observation.notifiedVersions.add(manifest.version);
+        onUpdateAvailable?.({
+          previous: observation.initialVersion,
+          current: manifest.version,
+        });
+      }
+      const currentEntry = (window as unknown as Record<string, unknown>)[
+        getRegistryKey(manifest.appName, name)
+      ];
+      if (currentEntry) {
+        return validateEntry<P>(currentEntry, manifest.appName, name);
+      }
+    }
+
     const mod = manifest.modules[name];
     if (!mod) {
       throw new Error(
@@ -215,5 +307,7 @@ export async function loadModule<P = Record<string, unknown>>(
     return validateEntry<P>(entry, manifest.appName, name);
   };
 
-  return withTimeout(run(), timeoutMs, `carregar o módulo "${name}"`);
+  return withTimeout(run(), timeoutMs, `carregar o módulo "${name}"`, () =>
+    controller.abort(),
+  );
 }

@@ -16,6 +16,14 @@ export interface Manifest {
   modules: Record<string, ManifestModule>;
 }
 
+/** Provider versions reported when a manifest changes after initial load. */
+export interface ModuleUpdateAvailable {
+  /** First version observed by this Consumer. */
+  previous: string;
+  /** New version available from the Provider. */
+  current: string;
+}
+
 export interface ModuleLifeCycleEvent {
   onCriticalFailure?: (error: Error) => void;
   /** Called once after the remote component commits; not called if rendering fails. */

@@ -6,7 +6,11 @@ import {
   type ReactNode,
 } from "react";
 import type { Root } from "react-dom/client";
-import type { ModuleLifeCycleEvent, RemoteModuleEntry } from "../shared/types";
+import type {
+  ModuleLifeCycleEvent,
+  ModuleUpdateAvailable,
+  RemoteModuleEntry,
+} from "../shared/types";
 import { loadModule } from "./loadModule";
 
 export interface ModuleProps {
@@ -15,6 +19,10 @@ export interface ModuleProps {
   path?: string;
   allowedHosts?: string[];
   timeoutMs?: number;
+  /** TTL do manifesto; `0` desativa o polling automático de atualizações. */
+  manifestTtlMs?: number;
+  /** Chamado quando o Provider publica uma nova versão; o módulo atual não é trocado. */
+  onUpdateAvailable?: (update: ModuleUpdateAvailable) => void;
   /**
    * Monta o módulo dentro de um Shadow DOM: o CSS do host não entra no módulo
    * e o do módulo não vaza para o host. Estilos do módulo precisam ser
@@ -42,6 +50,8 @@ export function Module(props: ModuleProps) {
     path,
     allowedHosts,
     timeoutMs,
+    manifestTtlMs = 60_000,
+    onUpdateAvailable,
     isolate = false,
     loading = null,
     fallback = null,
@@ -58,6 +68,8 @@ export function Module(props: ModuleProps) {
 
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const onUpdateAvailableRef = useRef(onUpdateAvailable);
+  onUpdateAvailableRef.current = onUpdateAvailable;
 
   const allowedKey = allowedHosts?.join(",");
 
@@ -66,7 +78,15 @@ export function Module(props: ModuleProps) {
     setEntry(null);
     setError(null);
 
-    loadModule({ host, name, path, allowedHosts, timeoutMs }).then(
+    loadModule({
+      host,
+      name,
+      path,
+      allowedHosts,
+      timeoutMs,
+      manifestTtlMs,
+      onUpdateAvailable: onUpdateAvailableRef.current,
+    }).then(
       (loaded) => {
         if (!cancelled) setEntry(loaded);
       },
@@ -83,7 +103,41 @@ export function Module(props: ModuleProps) {
     };
     // allowedHosts entra via allowedKey para não re-disparar a cada render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host, name, path, allowedKey, timeoutMs]);
+  }, [host, name, path, allowedKey, timeoutMs, manifestTtlMs]);
+
+  useEffect(() => {
+    if (!entry || manifestTtlMs === 0) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const checkForUpdates = async () => {
+      try {
+        await loadModule({
+          host,
+          name,
+          path,
+          allowedHosts,
+          timeoutMs,
+          manifestTtlMs,
+          onUpdateAvailable: onUpdateAvailableRef.current,
+        });
+      } catch (err) {
+        if (!cancelled) {
+          const e = err instanceof Error ? err : new Error(String(err));
+          onErrorRef.current?.(e);
+        }
+      }
+      if (!cancelled) {
+        timer = setTimeout(checkForUpdates, manifestTtlMs);
+      }
+    };
+
+    timer = setTimeout(checkForUpdates, manifestTtlMs);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [entry, host, name, path, allowedKey, timeoutMs, manifestTtlMs]);
 
   // Cria/destrói a raiz isolada quando o módulo carrega (ou quando `isolate` muda).
   useEffect(() => {

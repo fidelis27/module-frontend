@@ -66,6 +66,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   const registry = window as unknown as Record<string, unknown>;
   for (const key of Object.keys(window)) {
     if (key.startsWith("__REMOTE_MODULE__")) delete registry[key];
@@ -73,6 +74,51 @@ afterEach(() => {
 });
 
 describe("<Module />", () => {
+  it("revalida enquanto montado e avisa sem trocar o módulo em uso", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const updatedManifest = { ...manifest, version: "v2" };
+    const manifests = [manifest, updatedManifest];
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => manifests.shift() ?? updatedManifest,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const loaded = stubScripts({ "cart.js": registerCart });
+    const onUpdateAvailable = vi.fn();
+
+    const view = render(
+      <Module
+        name="cart"
+        host={HOST}
+        path="/modules/__modules_configuration"
+        allowedHosts={[HOST]}
+        manifestTtlMs={100}
+        onUpdateAvailable={onUpdateAvailable}
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("cart").textContent).toBe("cart:none");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onUpdateAvailable).toHaveBeenCalledTimes(1);
+    expect(onUpdateAvailable).toHaveBeenCalledWith({
+      previous: "v1",
+      current: "v2",
+    });
+    expect(loaded).toHaveLength(1);
+    expect(screen.getByTestId("cart").textContent).toBe("cart:none");
+    view.unmount();
+  });
+
   it("rejeita manifestos sem contrato ou com versão incompatível", async () => {
     for (const contractVersion of [undefined, CONTRACT_VERSION + 1]) {
       resetModuleCaches();
