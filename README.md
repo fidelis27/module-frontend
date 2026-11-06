@@ -78,7 +78,14 @@ Cuidados:
 ## Desenvolvimento
 
 ```
+npm run typecheck      # valida os tipos
+npm run lint           # ESLint, incluindo regras dos Hooks do React
+npm run format         # aplica Prettier
+npm run format:check   # verifica a formatação sem alterar arquivos
 npm test               # unitários + e2e com bundles reais (jsdom)
 npm run test:browser   # isolamento de CSS em Chromium real (CHROMIUM_PATH opcional)
-npm run build   # tsup (esm + cjs + d.ts)
+npm run build          # tsup (esm + cjs + d.ts)
+npm run check:package  # build, publint, attw e npm pack --dry-run
 ```
+
+O CI também testa os testes unitários com React 18 e React 19.
