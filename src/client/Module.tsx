@@ -14,7 +14,11 @@ import type {
 } from "../shared/types";
 import { loadModule } from "./loadModule";
 
-export interface ModuleProps {
+export interface ModuleFallbackProps {
+  retry: () => void;
+}
+
+export type ModuleProps<P extends object = Record<string, unknown>> = {
   name: string;
   host: string;
   path?: string;
@@ -37,19 +41,19 @@ export interface ModuleProps {
   /** Renderizado enquanto o módulo carrega. */
   loading?: ReactNode;
   /** Renderizado se o carregamento ou o render remoto falhar. Recebe retry para tentar novamente. */
-  fallback?: ReactNode | ((actions: { retry: () => void }) => ReactNode);
+  fallback?: ReactNode | ((actions: ModuleFallbackProps) => ReactNode);
   onError?: (error: Error) => void;
   moduleLifeCycleEvent?: ModuleLifeCycleEvent;
-  /** Demais props (entityId, source, callbacks...) vão direto ao módulo remoto. */
-  [prop: string]: unknown;
-}
+} & P;
 
 /** Base do shadow root: corta a herança de estilos do host (fonte, cor, etc.). */
 const SHADOW_BASE_CSS = ":host{all:initial;display:block}";
 let hasWarnedAboutLegacyIsolate = false;
 
 /** Lado Consumer: carrega o módulo remoto e o monta numa raiz React isolada. */
-export function Module(props: ModuleProps) {
+export function Module<P extends object = Record<string, unknown>>(
+  props: ModuleProps<P>,
+) {
   const {
     name,
     host,
@@ -73,7 +77,7 @@ export function Module(props: ModuleProps) {
   const rootRef = useRef<Root | null>(null);
   const shadowRef = useRef<ShadowRoot | null>(null);
   const forceReloadRef = useRef(false);
-  const [entry, setEntry] = useState<RemoteModuleEntry | null>(null);
+  const [entry, setEntry] = useState<RemoteModuleEntry<P> | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -110,7 +114,7 @@ export function Module(props: ModuleProps) {
     setEntry(null);
     setError(null);
 
-    loadModule({
+    loadModule<P>({
       host,
       name,
       path,
@@ -265,7 +269,7 @@ export function Module(props: ModuleProps) {
           },
         },
         entry.createElement(entry.Component, {
-          ...moduleProps,
+          ...(moduleProps as P),
           moduleLifeCycleEvent: lifeCycle,
         }),
       ),

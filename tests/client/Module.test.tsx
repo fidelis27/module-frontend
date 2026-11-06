@@ -150,7 +150,7 @@ describe("<Module />", () => {
     const loaded = stubScripts({ "cart.js": registerCart });
 
     render(
-      <Module
+      <Module<{ entityId: string }>
         name="cart"
         host={HOST}
         path="/modules/__modules_configuration"

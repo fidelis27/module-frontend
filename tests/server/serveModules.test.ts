@@ -12,7 +12,8 @@ let dir: string;
 let server: http.Server;
 let base: string;
 
-function raw(
+function rawAt(
+  targetBase: string,
   pathname: string,
   headers: http.OutgoingHttpHeaders = {},
   method = "GET",
@@ -22,7 +23,7 @@ function raw(
     body: string;
     headers: http.IncomingHttpHeaders;
   }>((resolve, reject) => {
-    const url = new URL(base);
+    const url = new URL(targetBase);
     const req = http.request(
       { host: url.hostname, port: url.port, path: pathname, method, headers },
       (res) => {
@@ -36,6 +37,14 @@ function raw(
     req.on("error", reject);
     req.end();
   });
+}
+
+function raw(
+  pathname: string,
+  headers: http.OutgoingHttpHeaders = {},
+  method = "GET",
+) {
+  return rawAt(base, pathname, headers, method);
 }
 
 beforeAll(async () => {
@@ -116,6 +125,45 @@ describe("serveModules", () => {
     expect(after.modules.cart.scripts[0]).not.toBe(
       before.modules.cart.scripts[0],
     );
+  });
+
+  it("filtra módulos por nome e faz exclude prevalecer sobre include", async () => {
+    const excludedModule = path.join(dir, "admin.js");
+    const notIncludedModule = path.join(dir, "hidden.js");
+    await writeFile(excludedModule, "window.admin = true;");
+    await writeFile(notIncludedModule, "window.hidden = true;");
+    const middleware = serveModules({
+      modulesPath: dir,
+      appName: "shop",
+      include: ["cart", "admin"],
+      exclude: ["admin"],
+    });
+    const filteredServer = http.createServer((req, res) =>
+      middleware(req, res, () => {
+        res.statusCode = 418;
+        res.end("next");
+      }),
+    );
+    await new Promise<void>((resolve) =>
+      filteredServer.listen(0, "127.0.0.1", resolve),
+    );
+    const filteredBase = `http://127.0.0.1:${(filteredServer.address() as AddressInfo).port}`;
+
+    try {
+      const manifest = JSON.parse(
+        (await rawAt(filteredBase, "/modules/__modules_configuration")).body,
+      );
+      expect(Object.keys(manifest.modules)).toEqual(["cart"]);
+      expect((await rawAt(filteredBase, "/modules/admin.js")).status).toBe(418);
+      expect((await rawAt(filteredBase, "/modules/hidden.js")).status).toBe(
+        418,
+      );
+      expect((await rawAt(filteredBase, "/modules/cart.js")).status).toBe(200);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        filteredServer.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   it("bloqueia path traversal (codificado e literal)", async () => {

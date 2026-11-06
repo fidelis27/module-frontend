@@ -19,6 +19,10 @@ export interface ServeModulesOptions {
   basePath?: string;
   /** Origens com permissão de CORS. `['*']` libera todas. Vazio = sem CORS. */
   corsOrigins?: string[];
+  /** Nomes de módulos permitidos; omitido significa sem filtro de inclusão. */
+  include?: string[];
+  /** Nomes de módulos bloqueados; prevalece sobre `include`. */
+  exclude?: string[];
 }
 
 type Next = (err?: unknown) => void;
@@ -59,11 +63,13 @@ function hashFile(file: string): Promise<{ hash: string; integrity: string }> {
 }
 
 export function serveModules(options: ServeModulesOptions): ModulesMiddleware {
-  const { appName, corsOrigins = [] } = options;
+  const { appName, corsOrigins = [], include, exclude } = options;
   const root = path.resolve(options.modulesPath);
   const basePath = (options.basePath ?? DEFAULT_BASE_PATH).replace(/\/+$/, "");
   const manifestPath = `${basePath}${ENDPOINTS.modulesConfiguration}`;
   const fileCache = new Map<string, FileInfo>();
+  const isModuleAllowed = (name: string) =>
+    (!include || include.includes(name)) && !exclude?.includes(name);
 
   async function buildManifest(): Promise<Manifest> {
     const entries = await readdir(root);
@@ -72,6 +78,8 @@ export function serveModules(options: ServeModulesOptions): ModulesMiddleware {
     const hashes: string[] = [];
 
     for (const file of names) {
+      const name = file.slice(0, -".js".length);
+      if (!isModuleAllowed(name)) continue;
       const full = path.join(root, file);
       const st = await stat(full);
       let info = fileCache.get(file);
@@ -84,7 +92,6 @@ export function serveModules(options: ServeModulesOptions): ModulesMiddleware {
         };
         fileCache.set(file, info);
       }
-      const name = file.slice(0, -".js".length);
       modules[name] = {
         name,
         scripts: [`${basePath}/${file}?v=${info.hash}`],
@@ -165,7 +172,13 @@ export function serveModules(options: ServeModulesOptions): ModulesMiddleware {
       const full = path.resolve(root, relative);
       const insideRoot = full.startsWith(root + path.sep);
       const allowedExt = full.endsWith(".js") || full.endsWith(".js.map");
-      if (!insideRoot || !allowedExt || relative.includes("\0")) {
+      const moduleName = path.basename(relative).replace(/\.js(?:\.map)?$/, "");
+      if (
+        !insideRoot ||
+        !allowedExt ||
+        relative.includes("\0") ||
+        !isModuleAllowed(moduleName)
+      ) {
         return passThrough();
       }
 
