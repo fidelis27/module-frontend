@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
   `nosniff` response headers.
 - Add the explicit `isolateStyles` prop and expose that mode through
   `ModuleContext`; keep `isolate` temporarily as a deprecated alias.
+- Allow `fallback` to render a retry action that revalidates the manifest and
+  reloads the remote script after load or render failures.
 
 ### Breaking Changes
 

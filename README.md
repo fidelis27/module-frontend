@@ -53,6 +53,20 @@ Props desconhecidas (`entityId`, callbacks...) vão direto ao módulo remoto.
 `moduleLifeCycleEvent.onMounted` é chamado uma vez depois do primeiro commit do
 componente remoto; `onCriticalFailure` sinaliza erros de renderização.
 
+`fallback` aceita um elemento React ou uma função que recebe `retry`. Isso
+permite oferecer uma nova tentativa tanto após falhas de carregamento quanto
+após erros de render; a tentativa revalida o manifesto e recarrega o script:
+
+```tsx
+<Module
+  name="cart"
+  host={HOST}
+  fallback={({ retry }) => (
+    <button onClick={retry}>Tentar novamente</button>
+  )}
+/>
+```
+
 ### Isolamento de CSS (`isolateStyles`)
 
 ```tsx
