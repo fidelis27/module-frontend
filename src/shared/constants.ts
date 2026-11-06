@@ -1,21 +1,7 @@
 export const REMOTE_MODULE_KEY = "__REMOTE_MODULE__";
 
-export const HEADERS = {
-  appVersion: "x-app-version",
-  appScope: "x-app-scope",
-  appName: "x-app-name",
-  userHash: "x-user-hash",
-} as const;
-
-export const CACHE_KEYS = {
-  manifests: "__manifests",
-  manifestCache: "__manifestCache",
-  resolvePropsCache: "__resolvePropsCache",
-} as const;
-
 export const ENDPOINTS = {
   modulesConfiguration: "/__modules_configuration",
-  resolveProps: "/__resolve_props",
 } as const;
 
 /** Prefixo padrão em que o Provider publica manifesto e bundles. */

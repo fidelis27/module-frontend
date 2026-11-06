@@ -16,6 +16,7 @@ export interface Manifest {
 
 export interface ModuleLifeCycleEvent {
   onCriticalFailure?: (error: Error) => void;
+  /** Called once after the remote component commits; not called if rendering fails. */
   onMounted?: () => void;
 }
 
@@ -35,14 +36,12 @@ export interface RemoteModuleEntry<P = Record<string, unknown>> {
   createElement: typeof createElement;
   ModuleContext: Context<ModuleContextValue | null>;
   Component: ComponentType<P & { moduleLifeCycleEvent?: ModuleLifeCycleEvent }>;
-  I18n?: unknown;
   /** CSS do módulo; com `isolate` é injetado dentro do shadow root. */
   styles?: string[];
 }
 
 export interface ModularizeOptions {
   appName: string;
-  I18n?: unknown;
   /**
    * CSS do módulo como texto. Com `<Module isolate />` é injetado no shadow root,
    * já que `<style>` colocado em document.head não alcança o Shadow DOM.

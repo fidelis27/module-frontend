@@ -1,4 +1,4 @@
-import { createElement, type ComponentType } from "react";
+import { createElement, useEffect, useRef, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 import { getRegistryKey } from "../shared/constants";
 import type {
@@ -11,6 +11,30 @@ import { ModuleContext } from "./ModuleContext";
 
 type WithLifeCycle<P> = P & { moduleLifeCycleEvent?: ModuleLifeCycleEvent };
 
+interface MountAwareComponentProps<P extends object> {
+  Component: ComponentType<P>;
+  componentProps: P;
+  onMounted?: () => void;
+}
+
+function MountAwareComponent<P extends object>({
+  Component,
+  componentProps,
+  onMounted,
+}: MountAwareComponentProps<P>) {
+  const didCallRef = useRef(false);
+  const onMountedRef = useRef(onMounted);
+  onMountedRef.current = onMounted;
+
+  useEffect(() => {
+    if (didCallRef.current) return;
+    didCallRef.current = true;
+    onMountedRef.current?.();
+  }, []);
+
+  return createElement(Component, componentProps);
+}
+
 /**
  * Lado Provider. Registra o módulo em `window` para o Consumer instanciar.
  * O React usado aqui é o do bundle do próprio módulo (isolamento de versão).
@@ -20,7 +44,7 @@ export function Modularize<P extends object = Record<string, unknown>>(
   Component: ComponentType<P>,
   options: ModularizeOptions,
 ): RemoteModuleEntry<P> {
-  const { appName, I18n, onCriticalFailure, styles } = options;
+  const { appName, onCriticalFailure, styles } = options;
 
   if (!appName) throw new Error(`Modularize("${name}"): appName é obrigatório`);
   if (!name) throw new Error("Modularize: name é obrigatório");
@@ -47,7 +71,11 @@ export function Modularize<P extends object = Record<string, unknown>>(
           );
         },
       },
-      createElement(Component as ComponentType<object>, rest),
+      createElement(MountAwareComponent<object>, {
+        Component: Component as ComponentType<object>,
+        componentProps: rest,
+        onMounted: moduleLifeCycleEvent?.onMounted,
+      }),
     );
   };
   Wrapped.displayName = `Modularized(${name})`;
@@ -59,7 +87,6 @@ export function Modularize<P extends object = Record<string, unknown>>(
     createElement,
     ModuleContext,
     Component: Wrapped,
-    I18n,
     styles: styles === undefined ? undefined : ([] as string[]).concat(styles),
   };
 

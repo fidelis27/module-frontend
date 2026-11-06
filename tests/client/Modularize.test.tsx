@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Modularize } from "../../src/client";
 import { getRegistryKey } from "../../src/shared";
@@ -82,5 +82,51 @@ describe("Modularize", () => {
     spy.mockRestore();
     expect(consumerHandler).toHaveBeenCalledTimes(1);
     expect(providerDefault).not.toHaveBeenCalled();
+  });
+
+  it("chama onMounted uma vez mesmo em StrictMode", async () => {
+    const onMounted = vi.fn();
+    const entry = Modularize("mounted", () => <div>mounted</div>, {
+      appName: "shop",
+    });
+    const root = entry.createRoot(document.createElement("div"));
+
+    await act(async () => {
+      root.render(
+        entry.createElement(
+          StrictMode,
+          {},
+          entry.createElement(entry.Component, {
+            moduleLifeCycleEvent: { onMounted },
+          }),
+        ),
+      );
+    });
+
+    expect(onMounted).toHaveBeenCalledTimes(1);
+  });
+
+  it("não chama onMounted se o componente falha ao renderizar", async () => {
+    const onMounted = vi.fn();
+    const entry = Modularize(
+      "mounted-error",
+      () => {
+        throw new Error("render failed");
+      },
+      { appName: "shop" },
+    );
+    const root = entry.createRoot(document.createElement("div"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await act(async () => {
+      root.render(
+        entry.createElement(entry.Component, {
+          moduleLifeCycleEvent: { onMounted },
+        }),
+      );
+    });
+
+    spy.mockRestore();
+    expect(onMounted).not.toHaveBeenCalled();
   });
 });
