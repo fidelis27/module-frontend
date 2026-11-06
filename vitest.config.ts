@@ -1,11 +1,14 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  esbuild: { jsx: 'automatic' },
+  esbuild: { jsx: "automatic" },
   test: {
-    environment: 'jsdom',
-    environmentMatchGlobs: [['tests/server/**', 'node'], ['tests/e2e/**', 'node']],
+    environment: "jsdom",
+    environmentMatchGlobs: [
+      ["tests/server/**", "node"],
+      ["tests/e2e/**", "node"],
+    ],
     globals: false,
-    exclude: ['node_modules/**', 'tests/browser/**'],
+    exclude: ["node_modules/**", "tests/browser/**"],
   },
 });

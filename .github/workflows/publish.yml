@@ -4,7 +4,7 @@ on:
     types: [published]
 permissions:
   contents: read
-  id-token: write   # necessário para --provenance
+  id-token: write # necessário para --provenance
 jobs:
   publish:
     runs-on: ubuntu-latest
