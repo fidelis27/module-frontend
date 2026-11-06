@@ -10,12 +10,12 @@ is sandboxed. The old `isolate` prop did not make this boundary clear.
 
 ## Options considered
 
-| Approach | CSS isolation | JavaScript isolation | Trade-offs |
-| --- | --- | --- | --- |
-| Shadow DOM | Yes, for selectors and style scoping | No; page globals are shared | Lightweight, supports portals through `shadowRoot`, and keeps a single page/runtime |
-| Iframe | Yes | Can provide a separate browsing context when sandboxed and configured carefully | Stronger boundary, but requires a messaging protocol and decisions about navigation, storage, focus, sizing, and permissions |
-| Custom Elements | Depends on using Shadow DOM | No | Useful component lifecycle and browser integration, but does not independently isolate JavaScript |
-| Module Federation | No inherent CSS boundary | No; modules normally share a page/runtime | Useful for shared dependencies and integration, but is not a security sandbox and is not used by this library |
+| Approach          | CSS isolation                        | JavaScript isolation                                                            | Trade-offs                                                                                                                   |
+| ----------------- | ------------------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Shadow DOM        | Yes, for selectors and style scoping | No; page globals are shared                                                     | Lightweight, supports portals through `shadowRoot`, and keeps a single page/runtime                                          |
+| Iframe            | Yes                                  | Can provide a separate browsing context when sandboxed and configured carefully | Stronger boundary, but requires a messaging protocol and decisions about navigation, storage, focus, sizing, and permissions |
+| Custom Elements   | Depends on using Shadow DOM          | No                                                                              | Useful component lifecycle and browser integration, but does not independently isolate JavaScript                            |
+| Module Federation | No inherent CSS boundary             | No; modules normally share a page/runtime                                       | Useful for shared dependencies and integration, but is not a security sandbox and is not used by this library                |
 
 ## Decision
 
@@ -39,4 +39,4 @@ into an iframe would not be sufficient.
   isolation.
 - Consumers needing stronger isolation must use a separate execution context.
 
-Open question: **queremos um modo iframe?**
+Future consideration: Should a sandboxed iframe mode be proposed separately?

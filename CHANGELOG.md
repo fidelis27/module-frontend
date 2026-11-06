@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-06
+
+See the [0.2.0 release notes](./docs/releases/0.2.0.md).
+
 ### Added
 
 - Implement `moduleLifeCycleEvent.onMounted`, called once after the remote
