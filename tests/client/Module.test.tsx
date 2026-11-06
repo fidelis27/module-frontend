@@ -463,4 +463,62 @@ describe("<Module />", () => {
     spy.mockRestore();
     expect(onError.mock.calls[0]![0].message).toBe("render quebrou");
   });
+
+  it("mostra fallback de render e retry recarrega manifesto e script", async () => {
+    const manifests = [manifest, { ...manifest, version: "v2" }];
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => manifests.shift() ?? manifest,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const onError = vi.fn();
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let shouldThrow = true;
+
+    const loaded = stubScripts({
+      "cart.js": () =>
+        void Modularize(
+          "cart",
+          () => {
+            if (shouldThrow) throw new Error("render quebrou");
+            return <p data-testid="cart">módulo recuperado</p>;
+          },
+          { appName: "shop" },
+        ),
+    });
+
+    render(
+      <Module
+        name="cart"
+        host={HOST}
+        path="/modules/__modules_configuration"
+        allowedHosts={[HOST]}
+        onError={onError}
+        fallback={({ retry }) => (
+          <div>
+            <span>módulo indisponível</span>
+            <button
+              onClick={() => {
+                shouldThrow = false;
+                retry();
+              }}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+      />,
+    );
+
+    await screen.findByText("módulo indisponível");
+    expect(onError.mock.calls[0]![0].message).toBe("render quebrou");
+    await act(async () =>
+      screen.getByRole("button", { name: "Tentar novamente" }).click(),
+    );
+    await screen.findByText("módulo recuperado");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(loaded).toHaveLength(2);
+    spy.mockRestore();
+  });
 });

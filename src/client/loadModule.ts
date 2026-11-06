@@ -26,6 +26,8 @@ export interface LoadModuleOptions {
   timeoutMs?: number;
   /** Tempo de cache do manifesto. `0` sempre revalida ao chamar `loadModule`. */
   manifestTtlMs?: number;
+  /** Ignora respostas em cache e recarrega o registro do módulo para uma nova tentativa. */
+  forceReload?: boolean;
   /** Chamado uma vez para cada nova versão encontrada após a primeira. */
   onUpdateAvailable?: (update: ModuleUpdateAvailable) => void;
   /** CSP nonce aplicado aos scripts remotos. */
@@ -154,13 +156,16 @@ function fetchManifest(
   fetchImpl: typeof fetch,
   manifestTtlMs: number,
   signal: AbortSignal,
+  forceReload: boolean,
 ): Promise<Manifest> {
   const key = url.href;
   const cached = manifestCache.get(key);
   if (
     cached &&
     (cached.pending ||
-      (manifestTtlMs > 0 && Date.now() - cached.fetchedAt < manifestTtlMs))
+      (!forceReload &&
+        manifestTtlMs > 0 &&
+        Date.now() - cached.fetchedAt < manifestTtlMs))
   ) {
     return cached.promise;
   }
@@ -198,10 +203,11 @@ function loadScript(
   url: URL,
   integrity?: string,
   nonce?: string,
+  forceReload = false,
 ): Promise<void> {
   const key = `${url.href}\0${integrity ?? ""}`;
   const cached = scriptCache.get(key);
-  if (cached) return cached;
+  if (cached && !forceReload) return cached;
 
   const promise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
@@ -233,6 +239,7 @@ export async function loadModule<P = Record<string, unknown>>(
     allowedHosts,
     timeoutMs = 15000,
     manifestTtlMs = DEFAULT_MANIFEST_TTL_MS,
+    forceReload = false,
     onUpdateAvailable,
     nonce,
     requireIntegrity = false,
@@ -254,6 +261,7 @@ export async function loadModule<P = Record<string, unknown>>(
       fetchImpl,
       manifestTtlMs,
       controller.signal,
+      forceReload,
     );
     if (!manifest || typeof manifest !== "object") {
       throw new Error(`Manifesto inválido em ${manifestUrl.origin}`);
@@ -267,6 +275,9 @@ export async function loadModule<P = Record<string, unknown>>(
     }
 
     const versionKey = JSON.stringify([manifestUrl.origin, manifest.appName]);
+    const registry = window as unknown as Record<string, unknown>;
+    const registryKey = getRegistryKey(manifest.appName, name);
+    if (forceReload) delete registry[registryKey];
     let observation = versionObservations.get(versionKey);
     if (!observation) {
       observation = {
@@ -285,9 +296,7 @@ export async function loadModule<P = Record<string, unknown>>(
           current: manifest.version,
         });
       }
-      const currentEntry = (window as unknown as Record<string, unknown>)[
-        getRegistryKey(manifest.appName, name)
-      ];
+      const currentEntry = registry[registryKey];
       if (currentEntry) {
         return validateEntry<P>(currentEntry, manifest.appName, name);
       }
@@ -333,7 +342,7 @@ export async function loadModule<P = Record<string, unknown>>(
     });
     await Promise.all(
       scriptUrls.map((url, index) =>
-        loadScript(url, mod.integrity?.[index], nonce),
+        loadScript(url, mod.integrity?.[index], nonce, forceReload),
       ),
     );
 

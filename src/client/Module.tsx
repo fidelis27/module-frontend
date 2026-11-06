@@ -1,5 +1,6 @@
 import {
   createElement,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -35,8 +36,8 @@ export interface ModuleProps {
   isolate?: boolean;
   /** Renderizado enquanto o módulo carrega. */
   loading?: ReactNode;
-  /** Renderizado se o carregamento falhar. */
-  fallback?: ReactNode;
+  /** Renderizado se o carregamento ou o render remoto falhar. Recebe retry para tentar novamente. */
+  fallback?: ReactNode | ((actions: { retry: () => void }) => ReactNode);
   onError?: (error: Error) => void;
   moduleLifeCycleEvent?: ModuleLifeCycleEvent;
   /** Demais props (entityId, source, callbacks...) vão direto ao módulo remoto. */
@@ -71,8 +72,10 @@ export function Module(props: ModuleProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<Root | null>(null);
   const shadowRef = useRef<ShadowRoot | null>(null);
+  const forceReloadRef = useRef(false);
   const [entry, setEntry] = useState<RemoteModuleEntry | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
@@ -83,6 +86,12 @@ export function Module(props: ModuleProps) {
   const nonceRef = useRef(nonce);
   nonceRef.current = nonce;
   const isolateStyles = isolateStylesProp ?? legacyIsolate ?? false;
+  const retry = useCallback(() => {
+    forceReloadRef.current = true;
+    setEntry(null);
+    setError(null);
+    setRetryCount((count) => count + 1);
+  }, []);
 
   const allowedKey = JSON.stringify(allowedHosts);
 
@@ -96,6 +105,8 @@ export function Module(props: ModuleProps) {
 
   useEffect(() => {
     let cancelled = false;
+    const forceReload = forceReloadRef.current;
+    forceReloadRef.current = false;
     setEntry(null);
     setError(null);
 
@@ -106,6 +117,7 @@ export function Module(props: ModuleProps) {
       allowedHosts: allowedHostsRef.current,
       timeoutMs,
       manifestTtlMs,
+      forceReload,
       onUpdateAvailable: onUpdateAvailableRef.current,
       nonce,
       requireIntegrity,
@@ -131,6 +143,7 @@ export function Module(props: ModuleProps) {
     allowedKey,
     timeoutMs,
     manifestTtlMs,
+    retryCount,
     nonce,
     requireIntegrity,
   ]);
@@ -235,6 +248,8 @@ export function Module(props: ModuleProps) {
     const lifeCycle: ModuleLifeCycleEvent = {
       ...moduleLifeCycleEvent,
       onCriticalFailure: (e) => {
+        setEntry(null);
+        setError(e);
         (moduleLifeCycleEvent?.onCriticalFailure ?? onErrorRef.current)?.(e);
       },
     };
@@ -257,8 +272,11 @@ export function Module(props: ModuleProps) {
     );
   });
 
-  if (error)
-    return createElement("div", { "data-module-error": name }, fallback);
+  if (error) {
+    const fallbackContent =
+      typeof fallback === "function" ? fallback({ retry }) : fallback;
+    return createElement("div", { "data-module-error": name }, fallbackContent);
+  }
 
   return createElement(
     "div",
