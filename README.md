@@ -53,13 +53,13 @@ Props desconhecidas (`entityId`, callbacks...) vão direto ao módulo remoto.
 `moduleLifeCycleEvent.onMounted` é chamado uma vez depois do primeiro commit do
 componente remoto; `onCriticalFailure` sinaliza erros de renderização.
 
-### Isolamento de CSS (`isolate`)
+### Isolamento de CSS (`isolateStyles`)
 
 ```tsx
-<Module name="cart" host={HOST} allowedHosts={[HOST]} isolate />
+<Module name="cart" host={HOST} allowedHosts={[HOST]} isolateStyles />
 ```
 
-Com `isolate`, o módulo é montado num **Shadow DOM**: o CSS do host não entra no módulo, o CSS do módulo não vaza para o host e a herança de fonte/cor do host é cortada (`:host { all: initial }`).
+Com `isolateStyles`, o módulo é montado num **Shadow DOM**: o CSS do host não entra no módulo, o CSS do módulo não vaza para o host e a herança de fonte/cor do host é cortada (`:host { all: initial }`).
 
 O Provider declara o CSS do módulo como texto, e o Consumer o injeta dentro do shadow root:
 
@@ -67,18 +67,26 @@ O Provider declara o CSS do módulo como texto, e o Consumer o injeta dentro do 
 Modularize('cart', Cart, { appName: 'shop', styles: cssText }); // string ou string[]
 ```
 
+O antigo prop `isolate` continua como alias depreciado e emite um `console.warn` apenas uma vez. Prefira `isolateStyles`; o alias será removido na versão 1.0.
+
+| O que é isolado | `isolateStyles` |
+| --- | --- |
+| CSS do host contra o módulo e CSS do módulo contra o host | Sim |
+| Variáveis CSS customizadas (`--cor`) | Não; atravessam a fronteira por design |
+| JavaScript, `window`, storage, cookies acessíveis por JavaScript e eventos globais | Não |
+| Versão do React | Sim; cada módulo usa o React do próprio bundle e uma raiz própria |
+
 Cuidados:
-- `<style>` colocado em `document.head` (style-loader, por exemplo) **não alcança** o shadow root. Em módulos usados com `isolate`, gere o CSS como texto (ex.: `?inline` no Vite, `css-loader` com `exportType: 'string'` no Webpack) e passe em `styles`.
+- `<style>` colocado em `document.head` (style-loader, por exemplo) **não alcança** o shadow root. Em módulos usados com `isolateStyles`, gere o CSS como texto (ex.: `?inline` no Vite, `css-loader` com `exportType: 'string'` no Webpack) e passe em `styles`.
 - Portais (modais, tooltips) devem apontar para o shadow root. Ele chega no módulo por `useContext(ModuleContext).shadowRoot`.
-- `isolate` isola CSS, não JavaScript: `window`, `localStorage` e eventos globais continuam compartilhados.
-- Variáveis CSS (`--cor`) do host **atravessam** a fronteira. Use isso para temas, se quiser.
+- `useContext(ModuleContext).isolateStyles` informa se o módulo está montado em Shadow DOM.
 
 ## Garantias e limites
 
 - **Allowlist:** por padrão só a mesma origem da página é aceita; qualquer outro host precisa estar em `allowedHosts`. Carregar script remoto é execução de código de terceiros.
 - **Cache:** scripts saem com `?v=<hash>` e `immutable`; o manifesto é `no-cache`.
 - **Isolamento de React:** o módulo usa o React do próprio bundle (o Provider precisa de React ≥ 18, porque usa `react-dom/client`).
-- **Isolamento de CSS:** só com `<Module isolate />` (veja acima).
+- **Isolamento de CSS:** só com `<Module isolateStyles />` (veja acima).
 - **Falhas:** erro de rede, timeout, módulo ausente e erro de render chegam em `onError`; falhas não ficam em cache.
 
 ## Compatibilidade do contrato

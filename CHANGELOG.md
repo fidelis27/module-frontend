@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
   Provider version is available without replacing the mounted module.
 - Add CSP nonces, cross-origin script loading, optional SRI enforcement, and
   `nosniff` response headers.
+- Add the explicit `isolateStyles` prop and expose that mode through
+  `ModuleContext`; keep `isolate` temporarily as a deprecated alias.
 
 ### Breaking Changes
 
