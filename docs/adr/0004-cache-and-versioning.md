@@ -23,7 +23,7 @@ it calls `onUpdateAvailable({ previous, current })` once per new version. It
 does not load or mount the newer script when the current entry is already
 registered.
 
-The global registry intentionally follows *first registration wins*. A host
+The global registry intentionally follows _first registration wins_. A host
 can decide to reload after receiving the callback; a reload is the supported
 way to adopt the new module version.
 
