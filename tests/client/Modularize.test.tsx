@@ -1,66 +1,77 @@
-import { act } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Modularize } from '../../src/client';
-import { getRegistryKey } from '../../src/shared';
+import { act } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Modularize } from "../../src/client";
+import { getRegistryKey } from "../../src/shared";
 
 afterEach(() => {
+  const registry = window as unknown as Record<string, unknown>;
   for (const key of Object.keys(window)) {
-    if (key.startsWith('__REMOTE_MODULE__')) delete (window as any)[key];
+    if (key.startsWith("__REMOTE_MODULE__")) delete registry[key];
   }
 });
 
-describe('Modularize', () => {
-  it('registra o módulo em window com a chave esperada', () => {
-    const entry = Modularize('cart', () => <div>cart</div>, { appName: 'shop' });
-    expect((window as any)[getRegistryKey('shop', 'cart')]).toBe(entry);
-    expect(getRegistryKey('shop', 'cart')).toBe('__REMOTE_MODULE___shop-cart');
-    expect(typeof entry.createRoot).toBe('function');
+describe("Modularize", () => {
+  it("registra o módulo em window com a chave esperada", () => {
+    const entry = Modularize("cart", () => <div>cart</div>, {
+      appName: "shop",
+    });
+    const registry = window as unknown as Record<string, unknown>;
+    expect(registry[getRegistryKey("shop", "cart")]).toBe(entry);
+    expect(getRegistryKey("shop", "cart")).toBe("__REMOTE_MODULE___shop-cart");
+    expect(typeof entry.createRoot).toBe("function");
     expect(entry.ModuleContext).toBeDefined();
   });
 
-  it('é idempotente: segundo script não troca a instância registrada', () => {
-    const first = Modularize('cart', () => <div>a</div>, { appName: 'shop' });
-    const second = Modularize('cart', () => <div>b</div>, { appName: 'shop' });
+  it("é idempotente: segundo script não troca a instância registrada", () => {
+    const first = Modularize("cart", () => <div>a</div>, { appName: "shop" });
+    const second = Modularize("cart", () => <div>b</div>, { appName: "shop" });
     expect(second).toBe(first);
   });
 
-  it('exige appName e name', () => {
-    expect(() => Modularize('cart', () => null, { appName: '' })).toThrow(/appName/);
-    expect(() => Modularize('', () => null, { appName: 'shop' })).toThrow(/name/);
+  it("exige appName e name", () => {
+    expect(() => Modularize("cart", () => null, { appName: "" })).toThrow(
+      /appName/,
+    );
+    expect(() => Modularize("", () => null, { appName: "shop" })).toThrow(
+      /name/,
+    );
   });
 
-  it('isola erros do componente e chama onCriticalFailure', async () => {
+  it("isola erros do componente e chama onCriticalFailure", async () => {
     const onCriticalFailure = vi.fn();
     const Boom = () => {
-      throw new Error('boom');
+      throw new Error("boom");
     };
-    const entry = Modularize('boom', Boom, { appName: 'shop', onCriticalFailure });
+    const entry = Modularize("boom", Boom, {
+      appName: "shop",
+      onCriticalFailure,
+    });
 
-    const container = document.createElement('div');
+    const container = document.createElement("div");
     const root = entry.createRoot(container);
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     await act(async () => {
       root.render(entry.createElement(entry.Component, {}));
     });
     spy.mockRestore();
 
     expect(onCriticalFailure).toHaveBeenCalledTimes(1);
-    expect(onCriticalFailure.mock.calls[0]![0].message).toBe('boom');
-    expect(container.innerHTML).toBe('');
+    expect(onCriticalFailure.mock.calls[0]![0].message).toBe("boom");
+    expect(container.innerHTML).toBe("");
   });
 
-  it('moduleLifeCycleEvent do consumer tem prioridade sobre o padrão do provider', async () => {
+  it("moduleLifeCycleEvent do consumer tem prioridade sobre o padrão do provider", async () => {
     const providerDefault = vi.fn();
     const consumerHandler = vi.fn();
     const Boom = () => {
-      throw new Error('x');
+      throw new Error("x");
     };
-    const entry = Modularize('boom2', Boom, {
-      appName: 'shop',
+    const entry = Modularize("boom2", Boom, {
+      appName: "shop",
       onCriticalFailure: providerDefault,
     });
-    const root = entry.createRoot(document.createElement('div'));
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const root = entry.createRoot(document.createElement("div"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     await act(async () => {
       root.render(
         entry.createElement(entry.Component, {

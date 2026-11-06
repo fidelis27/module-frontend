@@ -1,5 +1,5 @@
-import { DEFAULT_MANIFEST_PATH, getRegistryKey } from '../shared/constants';
-import type { Manifest, RemoteModuleEntry } from '../shared/types';
+import { DEFAULT_MANIFEST_PATH, getRegistryKey } from "../shared/constants";
+import type { Manifest, RemoteModuleEntry } from "../shared/types";
 
 export interface LoadModuleOptions {
   /** Origem do Provider, ex.: https://provider.example.com */
@@ -26,9 +26,16 @@ export function resetModuleCaches(): void {
   scriptCache.clear();
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Timeout (${ms}ms) ao ${label}`)), ms);
+    const timer = setTimeout(
+      () => reject(new Error(`Timeout (${ms}ms) ao ${label}`)),
+      ms,
+    );
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -42,9 +49,13 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
-function assertOriginAllowed(url: URL, allowedHosts: string[] | undefined): void {
-  if (allowedHosts?.includes('*')) return;
-  if (typeof window !== 'undefined' && url.origin === window.location.origin) return;
+function assertOriginAllowed(
+  url: URL,
+  allowedHosts: string[] | undefined,
+): void {
+  if (allowedHosts?.includes("*")) return;
+  if (typeof window !== "undefined" && url.origin === window.location.origin)
+    return;
   if (allowedHosts?.some((h) => new URL(h).origin === url.origin)) return;
   throw new Error(
     `Origem não autorizada: ${url.origin}. Adicione-a em allowedHosts para carregar este módulo.`,
@@ -57,9 +68,11 @@ function fetchManifest(url: URL, fetchImpl: typeof fetch): Promise<Manifest> {
   if (cached) return cached;
 
   const promise = (async () => {
-    const response = await fetchImpl(key, { credentials: 'omit' });
+    const response = await fetchImpl(key, { credentials: "omit" });
     if (!response.ok) {
-      throw new Error(`Falha ao buscar manifesto (${response.status}) em ${key}`);
+      throw new Error(
+        `Falha ao buscar manifesto (${response.status}) em ${key}`,
+      );
     }
     return (await response.json()) as Manifest;
   })();
@@ -76,7 +89,7 @@ function loadScript(url: URL): Promise<void> {
   if (cached) return cached;
 
   const promise = new Promise<void>((resolve, reject) => {
-    const script = document.createElement('script');
+    const script = document.createElement("script");
     script.src = key;
     script.async = true;
     script.onload = () => resolve();
@@ -111,7 +124,9 @@ export async function loadModule<P = Record<string, unknown>>(
     const manifest = await fetchManifest(manifestUrl, fetchImpl);
     const mod = manifest.modules[name];
     if (!mod) {
-      throw new Error(`Módulo "${name}" não existe no manifesto de ${manifestUrl.origin}`);
+      throw new Error(
+        `Módulo "${name}" não existe no manifesto de ${manifestUrl.origin}`,
+      );
     }
 
     const scriptUrls = mod.scripts.map((s) => {

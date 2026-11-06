@@ -1,13 +1,13 @@
-import { createElement, type ComponentType } from 'react';
-import { createRoot } from 'react-dom/client';
-import { getRegistryKey } from '../shared/constants';
+import { createElement, type ComponentType } from "react";
+import { createRoot } from "react-dom/client";
+import { getRegistryKey } from "../shared/constants";
 import type {
   ModularizeOptions,
   ModuleLifeCycleEvent,
   RemoteModuleEntry,
-} from '../shared/types';
-import { ErrorBoundary } from './ErrorBoundary';
-import { ModuleContext } from './ModuleContext';
+} from "../shared/types";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { ModuleContext } from "./ModuleContext";
 
 type WithLifeCycle<P> = P & { moduleLifeCycleEvent?: ModuleLifeCycleEvent };
 
@@ -23,7 +23,7 @@ export function Modularize<P extends object = Record<string, unknown>>(
   const { appName, I18n, onCriticalFailure, styles } = options;
 
   if (!appName) throw new Error(`Modularize("${name}"): appName é obrigatório`);
-  if (!name) throw new Error('Modularize: name é obrigatório');
+  if (!name) throw new Error("Modularize: name é obrigatório");
 
   const key = getRegistryKey(appName, name);
   const registry = window as unknown as Record<string, unknown>;
@@ -34,7 +34,7 @@ export function Modularize<P extends object = Record<string, unknown>>(
     return registry[key] as RemoteModuleEntry<P>;
   }
 
-  const Wrapped: RemoteModuleEntry<P>['Component'] = (props) => {
+  const Wrapped: RemoteModuleEntry<P>["Component"] = (props) => {
     const { moduleLifeCycleEvent, ...rest } = props as WithLifeCycle<P>;
     return createElement(
       ErrorBoundary,
@@ -42,7 +42,9 @@ export function Modularize<P extends object = Record<string, unknown>>(
         appName,
         name,
         onError: (error: Error) => {
-          (moduleLifeCycleEvent?.onCriticalFailure ?? onCriticalFailure)?.(error);
+          (moduleLifeCycleEvent?.onCriticalFailure ?? onCriticalFailure)?.(
+            error,
+          );
         },
       },
       createElement(Component as ComponentType<object>, rest),

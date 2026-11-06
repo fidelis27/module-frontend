@@ -5,21 +5,23 @@
  *
  * Rodar: npm run test:browser   (usa CHROMIUM_PATH ou /opt/pw-browsers/chromium)
  */
-import http from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { existsSync } from 'node:fs';
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import { build } from 'esbuild';
-import { chromium, type Browser, type Page } from 'playwright-core';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { serveModules } from '../../src/server';
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+import { existsSync } from "node:fs";
+import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { build } from "esbuild";
+import { chromium, type Browser, type Page } from "playwright-core";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { serveModules } from "../../src/server";
 
-const SRC = path.resolve(__dirname, '../../src');
+const SRC = path.resolve(__dirname, "../../src");
 const CHROMIUM =
   process.env.CHROMIUM_PATH ??
-  (existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : chromium.executablePath());
+  (existsSync("/opt/pw-browsers/chromium")
+    ? "/opt/pw-browsers/chromium"
+    : chromium.executablePath());
 const run = existsSync(CHROMIUM) ? describe : describe.skip;
 
 let tmp: string;
@@ -30,13 +32,13 @@ let consumerJs: string;
 
 const bundle = (code: string, outfile: string) =>
   build({
-    stdin: { contents: code, resolveDir: SRC, loader: 'tsx' },
+    stdin: { contents: code, resolveDir: SRC, loader: "tsx" },
     bundle: true,
-    format: 'iife',
+    format: "iife",
     outfile,
-    jsx: 'automatic',
-    define: { 'process.env.NODE_ENV': '"production"' },
-    logLevel: 'silent',
+    jsx: "automatic",
+    define: { "process.env.NODE_ENV": '"production"' },
+    logLevel: "silent",
   });
 
 const PAGE = `<!doctype html>
@@ -55,8 +57,8 @@ const PAGE = `<!doctype html>
 
 beforeAll(async () => {
   if (!existsSync(CHROMIUM)) return;
-  tmp = await mkdtemp(path.join(os.tmpdir(), 'mf-browser-'));
-  const modulesDir = path.join(tmp, 'modules');
+  tmp = await mkdtemp(path.join(os.tmpdir(), "mf-browser-"));
+  const modulesDir = path.join(tmp, "modules");
   await mkdir(modulesDir, { recursive: true });
 
   // Módulo com CSS próprio (declarado em `styles`) e um elemento por regra de interesse.
@@ -72,10 +74,10 @@ beforeAll(async () => {
        appName: 'shop',
        styles: 'h1 { color: rgb(0, 128, 0); } .badge { background: rgb(0, 128, 0); }',
      });`,
-    path.join(modulesDir, 'widget.js'),
+    path.join(modulesDir, "widget.js"),
   );
 
-  consumerJs = path.join(tmp, 'consumer.js');
+  consumerJs = path.join(tmp, "consumer.js");
   await bundle(
     `import { createRoot } from 'react-dom/client';
      import { Module } from './client';
@@ -85,14 +87,14 @@ beforeAll(async () => {
     consumerJs,
   );
 
-  const modules = serveModules({ modulesPath: modulesDir, appName: 'shop' });
+  const modules = serveModules({ modulesPath: modulesDir, appName: "shop" });
   server = http.createServer(async (req, res) => {
-    if (req.url === '/') {
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    if (req.url === "/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
       return void res.end(PAGE);
     }
-    if (req.url === '/consumer.js') {
-      res.setHeader('Content-Type', 'application/javascript');
+    if (req.url === "/consumer.js") {
+      res.setHeader("Content-Type", "application/javascript");
       return void res.end(await readFile(consumerJs));
     }
     return modules(req, res, () => {
@@ -100,9 +102,12 @@ beforeAll(async () => {
       res.end();
     });
   });
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
+  browser = await chromium.launch({
+    executablePath: CHROMIUM,
+    args: ["--no-sandbox"],
+  });
 }, 60000);
 
 afterAll(async () => {
@@ -112,11 +117,18 @@ afterAll(async () => {
 });
 
 /** Valor computado de uma propriedade, dentro ou fora do shadow root. */
-async function computed(page: Page, where: 'plain' | 'isolated', sel: string, prop: string) {
+async function computed(
+  page: Page,
+  where: "plain" | "isolated",
+  sel: string,
+  prop: string,
+) {
   return page.evaluate(
     ([where, sel, prop]) => {
       const host = document.getElementById(where)!;
-      const root = (host.querySelector('[data-module] > div') as HTMLElement).shadowRoot ?? host;
+      const root =
+        (host.querySelector("[data-module] > div") as HTMLElement).shadowRoot ??
+        host;
       const el = root.querySelector(sel as string) as HTMLElement;
       return getComputedStyle(el).getPropertyValue(prop as string);
     },
@@ -124,7 +136,7 @@ async function computed(page: Page, where: 'plain' | 'isolated', sel: string, pr
   );
 }
 
-run('isolate em Chromium real', () => {
+run("isolate em Chromium real", () => {
   let page: Page;
 
   beforeAll(async () => {
@@ -132,52 +144,82 @@ run('isolate em Chromium real', () => {
     await page.goto(origin);
     await page.waitForFunction(
       () =>
-        document.querySelector('#plain #m-p') &&
-        (document.querySelector('#isolated [data-module] > div') as HTMLElement | null)?.shadowRoot?.querySelector('#m-p'),
+        document.querySelector("#plain #m-p") &&
+        (
+          document.querySelector(
+            "#isolated [data-module] > div",
+          ) as HTMLElement | null
+        )?.shadowRoot?.querySelector("#m-p"),
       undefined,
       { timeout: 15000 },
     );
   }, 30000);
 
-  it('o módulo isolado fica dentro de um shadow root; o outro, no DOM normal', async () => {
-    expect(await page.evaluate(() => !!document.querySelector('#isolated #m-p'))).toBe(false);
-    expect(await page.evaluate(() => !!document.querySelector('#plain #m-p'))).toBe(true);
+  it("o módulo isolado fica dentro de um shadow root; o outro, no DOM normal", async () => {
+    expect(
+      await page.evaluate(() => !!document.querySelector("#isolated #m-p")),
+    ).toBe(false);
+    expect(
+      await page.evaluate(() => !!document.querySelector("#plain #m-p")),
+    ).toBe(true);
   });
 
-  it('CSS do host NÃO entra no módulo isolado (mas entra no não isolado)', async () => {
+  it("CSS do host NÃO entra no módulo isolado (mas entra no não isolado)", async () => {
     // O host define `p { color: red; font-size: 40px }`.
-    expect(await computed(page, 'plain', '#m-p', 'font-size')).toBe('40px');
-    expect(await computed(page, 'plain', '#m-p', 'color')).toBe('rgb(255, 0, 0)');
+    expect(await computed(page, "plain", "#m-p", "font-size")).toBe("40px");
+    expect(await computed(page, "plain", "#m-p", "color")).toBe(
+      "rgb(255, 0, 0)",
+    );
 
-    expect(await computed(page, 'isolated', '#m-p', 'font-size')).toBe('16px');
-    expect(await computed(page, 'isolated', '#m-p', 'color')).not.toBe('rgb(255, 0, 0)');
+    expect(await computed(page, "isolated", "#m-p", "font-size")).toBe("16px");
+    expect(await computed(page, "isolated", "#m-p", "color")).not.toBe(
+      "rgb(255, 0, 0)",
+    );
   });
 
-  it('a herança do host (fonte e cor do body) é cortada no módulo isolado', async () => {
+  it("a herança do host (fonte e cor do body) é cortada no módulo isolado", async () => {
     // body { font-family: Georgia, serif; color: blue }
-    expect(await computed(page, 'plain', '#m-h1', 'font-family')).toMatch(/Georgia/);
-    expect(await computed(page, 'isolated', '#m-h1', 'font-family')).not.toMatch(/Georgia/);
-    expect(await computed(page, 'isolated', '#m-badge', 'color')).not.toBe('rgb(0, 0, 255)');
+    expect(await computed(page, "plain", "#m-h1", "font-family")).toMatch(
+      /Georgia/,
+    );
+    expect(
+      await computed(page, "isolated", "#m-h1", "font-family"),
+    ).not.toMatch(/Georgia/);
+    expect(await computed(page, "isolated", "#m-badge", "color")).not.toBe(
+      "rgb(0, 0, 255)",
+    );
   });
 
-  it('o CSS declarado em `styles` vale dentro do módulo isolado', async () => {
-    expect(await computed(page, 'isolated', '#m-h1', 'color')).toBe('rgb(0, 128, 0)');
-    expect(await computed(page, 'isolated', '#m-badge', 'background-color')).toBe('rgb(0, 128, 0)');
+  it("o CSS declarado em `styles` vale dentro do módulo isolado", async () => {
+    expect(await computed(page, "isolated", "#m-h1", "color")).toBe(
+      "rgb(0, 128, 0)",
+    );
+    expect(
+      await computed(page, "isolated", "#m-badge", "background-color"),
+    ).toBe("rgb(0, 128, 0)");
   });
 
-  it('o CSS do módulo NÃO vaza para o host', async () => {
-    const hostH1 = await page.evaluate(() => getComputedStyle(document.getElementById('host-h1')!).color);
-    expect(hostH1).not.toBe('rgb(0, 128, 0)');
-    expect(await page.evaluate(() => document.head.querySelectorAll('style').length)).toBe(1);
+  it("o CSS do módulo NÃO vaza para o host", async () => {
+    const hostH1 = await page.evaluate(
+      () => getComputedStyle(document.getElementById("host-h1")!).color,
+    );
+    expect(hostH1).not.toBe("rgb(0, 128, 0)");
+    expect(
+      await page.evaluate(() => document.head.querySelectorAll("style").length),
+    ).toBe(1);
   });
 
-  it('eventos e render do React funcionam dentro do shadow root', async () => {
+  it("eventos e render do React funcionam dentro do shadow root", async () => {
     const text = await page.evaluate(
       () =>
-        ((document.querySelector('#isolated [data-module] > div') as HTMLElement).shadowRoot!.querySelector(
-          '#m-p',
-        ) as HTMLElement).textContent,
+        (
+          (
+            document.querySelector(
+              "#isolated [data-module] > div",
+            ) as HTMLElement
+          ).shadowRoot!.querySelector("#m-p") as HTMLElement
+        ).textContent,
     );
-    expect(text).toBe('module text');
+    expect(text).toBe("module text");
   });
 });

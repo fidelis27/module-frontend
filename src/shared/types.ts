@@ -1,5 +1,5 @@
-import type { ComponentType, Context, createElement } from 'react';
-import type { Root } from 'react-dom/client';
+import type { ComponentType, Context, createElement } from "react";
+import type { Root } from "react-dom/client";
 
 export interface ManifestModule {
   name: string;

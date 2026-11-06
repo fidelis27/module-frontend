@@ -1,7 +1,13 @@
-import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Root } from 'react-dom/client';
-import type { ModuleLifeCycleEvent, RemoteModuleEntry } from '../shared/types';
-import { loadModule } from './loadModule';
+import {
+  createElement,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import type { Root } from "react-dom/client";
+import type { ModuleLifeCycleEvent, RemoteModuleEntry } from "../shared/types";
+import { loadModule } from "./loadModule";
 
 export interface ModuleProps {
   name: string;
@@ -26,7 +32,7 @@ export interface ModuleProps {
 }
 
 /** Base do shadow root: corta a herança de estilos do host (fonte, cor, etc.). */
-const SHADOW_BASE_CSS = ':host{all:initial;display:block}';
+const SHADOW_BASE_CSS = ":host{all:initial;display:block}";
 
 /** Lado Consumer: carrega o módulo remoto e o monta numa raiz React isolada. */
 export function Module(props: ModuleProps) {
@@ -53,7 +59,7 @@ export function Module(props: ModuleProps) {
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
-  const allowedKey = allowedHosts?.join(',');
+  const allowedKey = allowedHosts?.join(",");
 
   useEffect(() => {
     let cancelled = false;
@@ -88,26 +94,28 @@ export function Module(props: ModuleProps) {
     let shadow: ShadowRoot | null = null;
 
     if (isolate) {
-      if (typeof container.attachShadow !== 'function') {
-        const e = new Error('isolate requer Shadow DOM, que este ambiente não suporta');
+      if (typeof container.attachShadow !== "function") {
+        const e = new Error(
+          "isolate requer Shadow DOM, que este ambiente não suporta",
+        );
         setError(e);
         onErrorRef.current?.(e);
         return;
       }
       // attachShadow só pode ser chamado uma vez por elemento: reaproveita o existente
       // (ex.: efeitos duplicados do StrictMode) e limpa o conteúdo anterior.
-      shadow = container.shadowRoot ?? container.attachShadow({ mode: 'open' });
+      shadow = container.shadowRoot ?? container.attachShadow({ mode: "open" });
       shadow.replaceChildren();
 
-      const base = document.createElement('style');
+      const base = document.createElement("style");
       base.textContent = SHADOW_BASE_CSS;
       shadow.appendChild(base);
       for (const css of entry.styles ?? []) {
-        const style = document.createElement('style');
+        const style = document.createElement("style");
         style.textContent = css;
         shadow.appendChild(style);
       }
-      mountPoint = document.createElement('div');
+      mountPoint = document.createElement("div");
       shadow.appendChild(mountPoint);
     }
 
@@ -135,7 +143,13 @@ export function Module(props: ModuleProps) {
     root.render(
       entry.createElement(
         entry.ModuleContext.Provider,
-        { value: { appName: entry.appName, name: entry.name, shadowRoot: shadowRef.current } },
+        {
+          value: {
+            appName: entry.appName,
+            name: entry.name,
+            shadowRoot: shadowRef.current,
+          },
+        },
         entry.createElement(entry.Component, {
           ...moduleProps,
           moduleLifeCycleEvent: lifeCycle,
@@ -144,14 +158,18 @@ export function Module(props: ModuleProps) {
     );
   });
 
-  if (error) return createElement('div', { 'data-module-error': name }, fallback);
+  if (error)
+    return createElement("div", { "data-module-error": name }, fallback);
 
   return createElement(
-    'div',
-    { 'data-module': name },
+    "div",
+    { "data-module": name },
     !entry && loading,
     // `key` recria o elemento quando `isolate` muda: um elemento que já recebeu
     // attachShadow não pode voltar a ser um container comum.
-    createElement('div', { ref: containerRef, key: isolate ? 'shadow' : 'light' }),
+    createElement("div", {
+      ref: containerRef,
+      key: isolate ? "shadow" : "light",
+    }),
   );
 }
