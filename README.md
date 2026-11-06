@@ -110,6 +110,26 @@ do mesmo módulo na mesma página pode misturar contextos e corromper o estado d
 React. Use o callback para decidir quando recarregar a página; a versão nova
 entra após o reload. Consulte [ADR 0004](./docs/adr/0004-cache-and-versioning.md).
 
+## Modelo de ameaças
+
+Scripts remotos executam com os privilégios da página hospedeira: podem acessar
+`window`, storage, cookies acessíveis por JavaScript e APIs disponíveis ao host.
+`allowedHosts` é uma lista de confiança, não um sandbox. Shadow DOM isola CSS,
+não JavaScript.
+
+O Consumer carrega scripts com `crossOrigin="anonymous"` para permitir que
+erros remotos incluam stack traces. Por isso, o Provider precisa autorizar a
+origem do Consumer em `corsOrigins`. `serveModules` publica hashes SRI SHA-384;
+use `requireIntegrity` para rejeitar módulos sem hash. SRI detecta conteúdo de
+script diferente do hash esperado quando o manifesto é confiável, mas não
+protege contra um Provider comprometido que possa alterar o bundle e o
+manifesto. `nonce` pode ser passado ao `<Module>` para as políticas CSP do host
+e também é aplicado aos estilos injetados no Shadow DOM.
+
+`X-Content-Type-Options: nosniff` é enviado para manifesto e bundles JavaScript.
+Para recomendações e limites completos, veja
+[ADR 0005](./docs/adr/0005-security-model.md).
+
 ## Desenvolvimento
 
 ```

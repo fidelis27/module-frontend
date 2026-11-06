@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 - Add a Provider/Consumer contract version to the manifest and remote entry.
 - Revalidate manifests every 60 seconds by default and notify hosts when a new
   Provider version is available without replacing the mounted module.
+- Add CSP nonces, cross-origin script loading, optional SRI enforcement, and
+  `nosniff` response headers.
 
 ### Breaking Changes
 
