@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
   `ModuleContext`; keep `isolate` temporarily as a deprecated alias.
 - Allow `fallback` to render a retry action that revalidates the manifest and
   reloads the remote script after load or render failures.
+- Add generic prop typing for `<Module>` and exact-name `include`/`exclude`
+  filters to `serveModules`; exclusions take precedence.
 
 ### Breaking Changes
 

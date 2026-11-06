@@ -24,16 +24,24 @@ app.use(serveModules({
   modulesPath: './dist/modules',
   appName: 'shop',            // igual ao appName do Modularize
   corsOrigins: ['https://app.example.com'],
+  include: ['cart', 'profile'], // opcional: allowlist de nomes exatos
+  exclude: ['profile'],         // opcional: prevalece sobre include
 }));
 // manifesto: GET /modules/__modules_configuration
 ```
+
+Sem `include`, todos os bundles `.js` no diretório são publicados. `exclude`
+sempre bloqueia o módulo correspondente, tanto no manifesto quanto no endpoint
+do script.
 
 ## Consumer
 
 ```tsx
 import { Module } from '@lib-core-mfe/module-frontend/client';
 
-<Module
+type CartProps = { entityId: string; onActionEvent: (event: Event) => void };
+
+<Module<CartProps>
   name="cart"
   host="https://provider.example.com"
   allowedHosts={['https://provider.example.com']}
@@ -49,7 +57,9 @@ import { Module } from '@lib-core-mfe/module-frontend/client';
 />
 ```
 
-Props desconhecidas (`entityId`, callbacks...) vão direto ao módulo remoto.
+O tipo genérico de `<Module<CartProps>>` verifica as props específicas do
+módulo; elas são repassadas ao componente remoto. Sem tipo explícito, props
+adicionais continuam aceitas por compatibilidade.
 `moduleLifeCycleEvent.onMounted` é chamado uma vez depois do primeiro commit do
 componente remoto; `onCriticalFailure` sinaliza erros de renderização.
 
