@@ -56,10 +56,10 @@ afterEach(() => {
   }
 });
 
-describe("<Module isolate />", () => {
+describe("<Module isolateStyles />", () => {
   it("monta o módulo dentro do shadow root, não no DOM comum", async () => {
     stub(registerCart());
-    const { container } = render(<Module {...common} isolate />);
+    const { container } = render(<Module {...common} isolateStyles />);
 
     await waitFor(() =>
       expect(
@@ -69,7 +69,7 @@ describe("<Module isolate />", () => {
     expect(container.querySelector('[data-testid="cart"]')).toBeNull();
   });
 
-  it("sem isolate não cria shadow root", async () => {
+  it("sem isolateStyles não cria shadow root", async () => {
     stub(registerCart());
     const { container } = render(<Module {...common} />);
 
@@ -81,7 +81,7 @@ describe("<Module isolate />", () => {
 
   it("injeta os styles do módulo no shadow root e nada no document", async () => {
     stub(registerCart(["p{color:red}", ".x{margin:0}"]));
-    const { container } = render(<Module {...common} isolate />);
+    const { container } = render(<Module {...common} isolateStyles />);
 
     await waitFor(() =>
       expect(
@@ -100,7 +100,7 @@ describe("<Module isolate />", () => {
 
   it("aceita styles como string única", async () => {
     stub(registerCart("b{font-weight:700}"));
-    const { container } = render(<Module {...common} isolate />);
+    const { container } = render(<Module {...common} isolateStyles />);
     await waitFor(() =>
       expect(
         hostEl(container).shadowRoot?.querySelector('[data-testid="cart"]'),
@@ -114,7 +114,7 @@ describe("<Module isolate />", () => {
   it("aplica o CSP nonce aos estilos do Shadow DOM", async () => {
     stub(registerCart("b{font-weight:700}"));
     const { container } = render(
-      <Module {...common} isolate nonce="csp-token" />,
+      <Module {...common} isolateStyles nonce="csp-token" />,
     );
     await waitFor(() =>
       expect(
@@ -135,7 +135,7 @@ describe("<Module isolate />", () => {
     const { container } = render(
       <>
         <p data-testid="host-p">host</p>
-        <Module {...common} isolate />
+        <Module {...common} isolateStyles />
       </>,
     );
     await waitFor(() =>
@@ -152,29 +152,37 @@ describe("<Module isolate />", () => {
 
   it("expõe o shadowRoot via ModuleContext (alvo para portais)", async () => {
     let seen: ShadowRoot | null | undefined;
+    let seenIsolation: boolean | undefined;
     const Probe = () => {
-      seen = useContext(ModuleContext)?.shadowRoot;
+      const context = useContext(ModuleContext);
+      seen = context?.shadowRoot;
+      seenIsolation = context?.isolateStyles;
       return <i data-testid="probe" />;
     };
     stub(() => void Modularize("cart", Probe, { appName: "shop" }));
-    const { container } = render(<Module {...common} isolate />);
+    const { container } = render(<Module {...common} isolateStyles />);
 
     await waitFor(() => expect(seen).toBeTruthy());
     expect(seen).toBe(hostEl(container).shadowRoot);
+    expect(seenIsolation).toBe(true);
   });
 
-  it("sem isolate, shadowRoot no contexto é null", async () => {
+  it("sem isolateStyles, shadowRoot no contexto é null", async () => {
     let seen: ShadowRoot | null | undefined = undefined;
+    let seenIsolation: boolean | undefined;
     const Probe = () => {
-      seen = useContext(ModuleContext)?.shadowRoot;
+      const context = useContext(ModuleContext);
+      seen = context?.shadowRoot;
+      seenIsolation = context?.isolateStyles;
       return null;
     };
     stub(() => void Modularize("cart", Probe, { appName: "shop" }));
     render(<Module {...common} />);
     await waitFor(() => expect(seen).toBe(null));
+    expect(seenIsolation).toBe(false);
   });
 
-  it("a prop isolate não vaza para o componente remoto", async () => {
+  it("a prop isolateStyles não vaza para o componente remoto", async () => {
     const received: Record<string, unknown>[] = [];
     stub(
       () =>
@@ -184,34 +192,55 @@ describe("<Module isolate />", () => {
           { appName: "shop" },
         ),
     );
-    render(<Module {...common} isolate entityId="1" />);
+    render(<Module {...common} isolateStyles entityId="1" />);
     await waitFor(() => expect(received.length).toBeGreaterThan(0));
     expect(received[0]).toMatchObject({ entityId: "1" });
-    expect(received[0]).not.toHaveProperty("isolate");
+    expect(received[0]).not.toHaveProperty("isolateStyles");
   });
 
-  it("alternar isolate recria o container e remonta no lugar certo", async () => {
+  it("alternar isolateStyles recria o container e remonta no lugar certo", async () => {
     stub(registerCart());
-    const { container, rerender } = render(<Module {...common} isolate />);
+    const { container, rerender } = render(
+      <Module {...common} isolateStyles />,
+    );
     await waitFor(() =>
       expect(
         hostEl(container).shadowRoot?.querySelector('[data-testid="cart"]'),
       ).toBeTruthy(),
     );
 
-    rerender(<Module {...common} isolate={false} />);
+    rerender(<Module {...common} isolateStyles={false} />);
     await waitFor(() =>
       expect(container.querySelector('[data-testid="cart"]')).not.toBeNull(),
     );
     expect(hostEl(container).shadowRoot).toBeNull();
 
-    rerender(<Module {...common} isolate />);
+    rerender(<Module {...common} isolateStyles />);
     await waitFor(() =>
       expect(
         hostEl(container).shadowRoot?.querySelector('[data-testid="cart"]'),
       ).toBeTruthy(),
     );
     expect(container.querySelector('[data-testid="cart"]')).toBeNull();
+  });
+
+  it("mantém o alias isolate com um aviso único de depreciação", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    stub(registerCart());
+    const { container } = render(
+      <>
+        <Module {...common} isolate />
+        <Module {...common} isolate />
+      </>,
+    );
+
+    await waitFor(() =>
+      expect(
+        hostEl(container).shadowRoot?.querySelector('[data-testid="cart"]'),
+      ).toBeTruthy(),
+    );
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(warning.mock.calls[0]![0]).toMatch(/isolateStyles/);
   });
 
   it("chama onError e mostra fallback se o ambiente não suporta Shadow DOM", async () => {
@@ -224,7 +253,7 @@ describe("<Module isolate />", () => {
       const { findByText } = render(
         <Module
           {...common}
-          isolate
+          isolateStyles
           onError={onError}
           fallback={<span>sem shadow</span>}
         />,

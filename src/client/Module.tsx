@@ -27,10 +27,10 @@ export interface ModuleProps {
   nonce?: string;
   /** Rejeita o módulo se o manifesto não contiver SRI para cada script. */
   requireIntegrity?: boolean;
+  /** Monta este módulo em um Shadow DOM para isolar seu CSS. */
+  isolateStyles?: boolean;
   /**
-   * Monta o módulo dentro de um Shadow DOM: o CSS do host não entra no módulo
-   * e o do módulo não vaza para o host. Estilos do módulo precisam ser
-   * declarados em `Modularize(..., { styles })` para serem injetados no shadow root.
+   * @deprecated Use `isolateStyles`; este alias será removido na versão 1.0.
    */
   isolate?: boolean;
   /** Renderizado enquanto o módulo carrega. */
@@ -45,6 +45,7 @@ export interface ModuleProps {
 
 /** Base do shadow root: corta a herança de estilos do host (fonte, cor, etc.). */
 const SHADOW_BASE_CSS = ":host{all:initial;display:block}";
+let hasWarnedAboutLegacyIsolate = false;
 
 /** Lado Consumer: carrega o módulo remoto e o monta numa raiz React isolada. */
 export function Module(props: ModuleProps) {
@@ -58,7 +59,8 @@ export function Module(props: ModuleProps) {
     onUpdateAvailable,
     nonce,
     requireIntegrity,
-    isolate = false,
+    isolateStyles: isolateStylesProp,
+    isolate: legacyIsolate,
     loading = null,
     fallback = null,
     onError,
@@ -80,8 +82,17 @@ export function Module(props: ModuleProps) {
   allowedHostsRef.current = allowedHosts;
   const nonceRef = useRef(nonce);
   nonceRef.current = nonce;
+  const isolateStyles = isolateStylesProp ?? legacyIsolate ?? false;
 
   const allowedKey = JSON.stringify(allowedHosts);
+
+  useEffect(() => {
+    if (legacyIsolate === undefined || hasWarnedAboutLegacyIsolate) return;
+    hasWarnedAboutLegacyIsolate = true;
+    console.warn(
+      "A prop `isolate` de `Module` foi depreciada; use `isolateStyles`. O alias será removido na versão 1.0.",
+    );
+  }, [legacyIsolate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,7 +181,7 @@ export function Module(props: ModuleProps) {
     requireIntegrity,
   ]);
 
-  // Cria/destrói a raiz isolada quando o módulo carrega (ou quando `isolate` muda).
+  // Cria/destrói a raiz isolada quando o módulo carrega (ou quando `isolateStyles` muda).
   useEffect(() => {
     const container = containerRef.current;
     if (!entry || !container) return;
@@ -178,10 +189,10 @@ export function Module(props: ModuleProps) {
     let mountPoint: Element = container;
     let shadow: ShadowRoot | null = null;
 
-    if (isolate) {
+    if (isolateStyles) {
       if (typeof container.attachShadow !== "function") {
         const e = new Error(
-          "isolate requer Shadow DOM, que este ambiente não suporta",
+          "isolateStyles requer Shadow DOM, que este ambiente não suporta",
         );
         setError(e);
         onErrorRef.current?.(e);
@@ -215,7 +226,7 @@ export function Module(props: ModuleProps) {
       // Adia o unmount: desmontar síncrono durante o commit do React pai gera warning.
       queueMicrotask(() => root.unmount());
     };
-  }, [entry, isolate]);
+  }, [entry, isolateStyles]);
 
   // Re-renderiza o módulo remoto a cada mudança de props.
   useEffect(() => {
@@ -234,6 +245,7 @@ export function Module(props: ModuleProps) {
           value: {
             appName: entry.appName,
             name: entry.name,
+            isolateStyles,
             shadowRoot: shadowRef.current,
           },
         },
@@ -252,11 +264,11 @@ export function Module(props: ModuleProps) {
     "div",
     { "data-module": name },
     !entry && loading,
-    // `key` recria o elemento quando `isolate` muda: um elemento que já recebeu
+    // `key` recria o elemento quando `isolateStyles` muda: um elemento que já recebeu
     // attachShadow não pode voltar a ser um container comum.
     createElement("div", {
       ref: containerRef,
-      key: isolate ? "shadow" : "light",
+      key: isolateStyles ? "shadow" : "light",
     }),
   );
 }

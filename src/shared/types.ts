@@ -35,7 +35,9 @@ export interface ModuleLifeCycleEvent {
 export interface ModuleContextValue {
   appName: string;
   name: string;
-  /** Shadow root onde o módulo está montado (só com `isolate`). Use como alvo de portais e style tags. */
+  /** Indica se os estilos do módulo estão em um Shadow DOM. */
+  isolateStyles: boolean;
+  /** Shadow root do módulo; use como alvo para portais e tags de estilo. */
   shadowRoot?: ShadowRoot | null;
   [key: string]: unknown;
 }
@@ -49,14 +51,14 @@ export interface RemoteModuleEntry<P = Record<string, unknown>> {
   createElement: typeof createElement;
   ModuleContext: Context<ModuleContextValue | null>;
   Component: ComponentType<P & { moduleLifeCycleEvent?: ModuleLifeCycleEvent }>;
-  /** CSS do módulo; com `isolate` é injetado dentro do shadow root. */
+  /** CSS do módulo; com `isolateStyles` é injetado no Shadow DOM. */
   styles?: string[];
 }
 
 export interface ModularizeOptions {
   appName: string;
   /**
-   * CSS do módulo como texto. Com `<Module isolate />` é injetado no shadow root,
+   * CSS do módulo como texto. Com `<Module isolateStyles />` é injetado no shadow root,
    * já que `<style>` colocado em document.head não alcança o Shadow DOM.
    */
   styles?: string | string[];

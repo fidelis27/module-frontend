@@ -1,5 +1,5 @@
 /**
- * Prova em browser real (Chromium) de que `isolate` isola CSS nos dois sentidos
+ * Prova em browser real (Chromium) de que `isolateStyles` isola CSS nos dois sentidos
  * e corta a herança de estilos do host. jsdom não implementa a cascata, então
  * estes testes só fazem sentido num browser de verdade.
  *
@@ -85,7 +85,7 @@ beforeAll(async () => {
      import { Module } from './client';
      const common = { name: 'widget', host: location.origin, allowedHosts: [location.origin] };
      createRoot(document.getElementById('plain')!).render(<Module {...common} />);
-     createRoot(document.getElementById('isolated')!).render(<Module {...common} isolate />);
+     createRoot(document.getElementById('isolated')!).render(<Module {...common} isolateStyles />);
      createRoot(document.getElementById('integrity')!).render(
        <Module
          name="widget"
@@ -165,7 +165,7 @@ async function computed(
   );
 }
 
-run("isolate em Chromium real", () => {
+run("isolateStyles em Chromium real", () => {
   let page: Page;
 
   beforeAll(async () => {
