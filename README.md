@@ -46,6 +46,8 @@ import { Module } from '@lib-core-mfe/module-frontend/client';
 ```
 
 Props desconhecidas (`entityId`, callbacks...) vão direto ao módulo remoto.
+`moduleLifeCycleEvent.onMounted` é chamado uma vez depois do primeiro commit do
+componente remoto; `onCriticalFailure` sinaliza erros de renderização.
 
 ### Isolamento de CSS (`isolate`)
 
