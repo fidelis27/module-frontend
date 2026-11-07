@@ -25,12 +25,12 @@ can pass other required values through the remote module's props.
 
 ## Options considered
 
-| Approach | Fit for this library | Trade-offs |
-| --- | --- | --- |
-| Per-module bundles registered on `window` | Selected: matches the manifest-and-script loading path and lets each bundle provide the APIs used to mount its component | Bundle size can increase when modules include their own React dependencies; host React context does not cross the separate root |
-| Module Federation | Not used: it is not required for the current manifest and registry contract | Can support shared dependencies and runtime integration, but introduces a different federation and dependency-sharing model |
-| Custom Elements | Not used as the module registration and mounting API | Provides a browser component interface; it does not, by itself, create a separate JavaScript realm or React runtime |
-| Iframe | Not part of the current runtime | Creates a separate browsing context, but mounting and interacting with React modules would require a messaging and lifecycle integration that this library does not implement |
+| Approach                                  | Fit for this library                                                                                                     | Trade-offs                                                                                                                                                                    |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Per-module bundles registered on `window` | Selected: matches the manifest-and-script loading path and lets each bundle provide the APIs used to mount its component | Bundle size can increase when modules include their own React dependencies; host React context does not cross the separate root                                               |
+| Module Federation                         | Not used: it is not required for the current manifest and registry contract                                              | Can support shared dependencies and runtime integration, but introduces a different federation and dependency-sharing model                                                   |
+| Custom Elements                           | Not used as the module registration and mounting API                                                                     | Provides a browser component interface; it does not, by itself, create a separate JavaScript realm or React runtime                                                           |
+| Iframe                                    | Not part of the current runtime                                                                                          | Creates a separate browsing context, but mounting and interacting with React modules would require a messaging and lifecycle integration that this library does not implement |
 
 ## Decision
 

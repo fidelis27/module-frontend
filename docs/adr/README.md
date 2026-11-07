@@ -6,6 +6,7 @@ one when the design changes.
 
 | ADR                                    | Decision                                                                                    | Status   |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- | -------- |
+| [0001](./0001-module-registry.md)      | Register independently bundled modules on `window`                                          | Accepted |
 | [0002](./0002-isolation-model.md)      | Use Shadow DOM for CSS isolation; do not imply JavaScript sandboxing                        | Accepted |
 | [0003](./0003-contract-version.md)     | Version and validate the Provider/Consumer contract                                         | Accepted |
 | [0004](./0004-cache-and-versioning.md) | Revalidate manifests without swapping mounted modules                                       | Accepted |

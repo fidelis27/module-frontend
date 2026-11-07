@@ -6,7 +6,9 @@
 ## Context
 
 Remote modules need predictable styles without implying that their JavaScript
-is sandboxed. The old `isolate` prop did not make this boundary clear.
+is sandboxed. The registry and separate React root are described in
+[ADR 0001](./0001-module-registry.md). The old `isolate` prop did not make this
+boundary clear.
 
 ## Options considered
 

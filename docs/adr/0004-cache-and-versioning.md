@@ -9,6 +9,8 @@ The Consumer previously cached each manifest indefinitely. A page left open
 could not learn that its Provider had deployed a newer bundle. At the same
 time, silently replacing a registered module in place risks mixing versions of
 the module's React runtime and context.
+The registry's first-registration behavior is part of the module architecture
+described in [ADR 0001](./0001-module-registry.md).
 
 ## Decision
 
