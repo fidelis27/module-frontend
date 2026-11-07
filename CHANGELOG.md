@@ -6,7 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [0.2.0] - 2026-11-06
 
-See the [0.2.0 release notes](./docs/releases/0.2.0.md).
+The duplicate release-note document is retained in the
+[documentation archive](./docs/README.md#historical-documentation).
 
 ### Added
 
