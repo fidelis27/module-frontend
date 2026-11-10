@@ -7,3 +7,4 @@ export {
   resetModuleCaches,
   type LoadModuleOptions,
 } from "./loadModule";
+export { createBusHooks } from "./busHooks";

@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     "shared/index": "src/shared/index.ts",
+    "bus/index": "src/bus/index.ts",
     "client/index": "src/client/index.ts",
     "server/index": "src/server/index.ts",
   },
