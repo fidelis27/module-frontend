@@ -27,6 +27,12 @@ interface ConsumerWindow extends Window {
     onActionEvent?: (event: unknown) => void;
     onError?: (error: Error) => void;
   }) => void;
+  subscribeBus: (
+    listener: (
+      event: { action: string; entityId?: string },
+      source?: string,
+    ) => void,
+  ) => void;
 }
 
 async function bundle(entryCode: string, outfile: string) {
@@ -48,8 +54,14 @@ beforeAll(async () => {
 
   await bundle(
     `import { Modularize } from './client';
+     import { createBus } from './bus';
+     type Events = { 'cart:clicked': { action: string; entityId?: string } };
+     const bus = createBus<Events>({ source: 'shop-cart' });
      Modularize('cart', ({ entityId, onActionEvent }: any) => (
-       <button data-testid="btn" onClick={() => onActionEvent?.({ action: 'SUBMIT', entityId })}>
+       <button data-testid="btn" onClick={() => {
+         onActionEvent?.({ action: 'SUBMIT', entityId });
+         bus.publish('cart:clicked', { action: 'SUBMIT', entityId });
+       }}>
          cart:{entityId}
        </button>
      ), { appName: 'shop' });`,
@@ -66,6 +78,13 @@ beforeAll(async () => {
   await bundle(
     `import { createRoot } from 'react-dom/client';
      import { Module } from './client';
+     import { createBus } from './bus';
+     type Events = { 'cart:clicked': { action: string; entityId?: string } };
+     const bus = createBus<Events>();
+     (window as Window & {
+       subscribeBus: (listener: (event: Events['cart:clicked'], source?: string) => void) => void;
+     }).subscribeBus = (listener) => bus.subscribe('cart:clicked', (event, meta) =>
+       listener(event, meta.source));
      (window as any).mountConsumer = (props: any) =>
        createRoot(document.getElementById('root')!).render(<Module {...props} />);`,
     consumerFile,
@@ -127,6 +146,14 @@ describe("provider → servidor → consumer (bundles reais, Reacts separados)",
     const dom = await bootConsumer();
     const consumerWindow = dom.window as unknown as ConsumerWindow;
     const events: unknown[] = [];
+    const busEvents: Array<{
+      action: string;
+      entityId?: string;
+      source?: string;
+    }> = [];
+    consumerWindow.subscribeBus((event, source) =>
+      busEvents.push({ ...event, source }),
+    );
 
     consumerWindow.mountConsumer({
       name: "cart",
@@ -143,6 +170,9 @@ describe("provider → servidor → consumer (bundles reais, Reacts separados)",
 
     btn.click();
     expect(events).toEqual([{ action: "SUBMIT", entityId: "42" }]);
+    expect(busEvents).toEqual([
+      { action: "SUBMIT", entityId: "42", source: "shop-cart" },
+    ]);
 
     // O script foi injetado uma vez, com versão por hash.
     const scripts = [

@@ -1,6 +1,6 @@
 {
   "name": "@lib-core-mfe/module-frontend",
-  "version": "0.2.0",
+  "version": "0.3.0-rc.1",
   "description": "React micro-frontends with manifest-based remote module loading and a global browser registry.",
   "license": "MIT",
   "repository": {
@@ -53,6 +53,16 @@
         "default": "./dist/client/index.cjs"
       }
     },
+    "./bus": {
+      "import": {
+        "types": "./dist/bus/index.d.ts",
+        "default": "./dist/bus/index.js"
+      },
+      "require": {
+        "types": "./dist/bus/index.d.cts",
+        "default": "./dist/bus/index.cjs"
+      }
+    },
     "./server": {
       "import": {
         "types": "./dist/server/index.d.ts",
@@ -69,6 +79,9 @@
       "client": [
         "dist/client/index.d.ts"
       ],
+      "bus": [
+        "dist/bus/index.d.ts"
+      ],
       "server": [
         "dist/server/index.d.ts"
       ]
@@ -80,8 +93,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"*.json\" \"*.ts\" \".github/workflows/*.yml\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"*.json\" \"*.ts\" \".github/workflows/*.yml\"",
+    "measure:bus": "node scripts/measure-bus-size.mjs",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.json\" \"*.ts\" \".github/workflows/*.yml\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.json\" \"*.ts\" \".github/workflows/*.yml\"",
     "check:package": "npm run build && publint && attw --pack . && node -e \"const p=require('./package.json');if(!p.files?.includes('dist')||!require('node:fs').existsSync('dist')){console.error('package.json must include dist in files and dist/ must exist');process.exit(1)}\" && npm pack --dry-run",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "test:browser": "vitest run --config vitest.browser.config.ts"
