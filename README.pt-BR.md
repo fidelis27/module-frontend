@@ -132,6 +132,33 @@ um aviso uma única vez. Prefira `isolateStyles`; a remoção do alias está
 planejada para a versão 1.0. Shadow DOM não é um sandbox de JavaScript. Consulte
 [ADR 0002](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0002-isolation-model.md).
 
+## Event bus
+
+Use a entrada independente de framework `/bus` para eventos tipados entre
+módulos empacotados separadamente e os hooks de `/client` nos componentes
+React:
+
+```ts
+import { createBus } from "@lib-core-mfe/module-frontend/bus";
+import { createBusHooks } from "@lib-core-mfe/module-frontend/client";
+
+type AppEvents = {
+  "nav:request": { path: string };
+  "student:created": { id: string };
+};
+
+const bus = createBus<AppEvents>();
+export const { usePublish, useSubscribe } = createBusHooks(bus);
+```
+
+`usePublish` atribui o evento ao módulo atual; `useSubscribe` cancela a
+assinatura ao desmontar. A entrega é síncrona. Retenção e replay são opcionais:
+`publish(channel, payload, { ttl })` retém um evento e
+`subscribe(channel, handler, { replay: true })` reproduz eventos não expirados.
+Erros de handlers não impedem a entrega aos outros assinantes. Consulte o
+[guia do event bus](./docs/guides/event-bus-pt-br.md) e as
+[ADRs 0006–0007](./docs/adr/README.md).
+
 ## Guarantees and limits
 
 - **Allowlist:** por padrão, somente a mesma origem da página é aceita; adicione
@@ -212,6 +239,7 @@ npm run check:docs
 npm test
 npm run test:browser
 npm run build
+npm run measure:bus
 npm run check:package
 ```
 

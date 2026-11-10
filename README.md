@@ -130,6 +130,32 @@ once. Use `isolateStyles`; the alias is scheduled for removal in version 1.0.
 Shadow DOM is not a JavaScript security sandbox. See
 [ADR 0002](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0002-isolation-model.md).
 
+## Event bus
+
+Use the framework-independent `/bus` entry for typed events shared across
+independently bundled modules, and the `/client` hooks from React components:
+
+```ts
+import { createBus } from "@lib-core-mfe/module-frontend/bus";
+import { createBusHooks } from "@lib-core-mfe/module-frontend/client";
+
+type AppEvents = {
+  "nav:request": { path: string };
+  "student:created": { id: string };
+};
+
+const bus = createBus<AppEvents>();
+export const { usePublish, useSubscribe } = createBusHooks(bus);
+```
+
+`usePublish` attributes events to the current module; `useSubscribe` cleans up
+on unmount. Delivery is synchronous. Retention and replay are opt-in:
+`publish(channel, payload, { ttl })` retains an event and
+`subscribe(channel, handler, { replay: true })` replays unexpired events.
+Handler errors do not stop delivery to other subscribers. See the
+[event bus guide](./docs/guides/event-bus.md) and
+[ADRs 0006–0007](./docs/adr/README.md).
+
 ## Guarantees and limits
 
 - **Allowlist:** by default, only the page's same origin is accepted; add
@@ -208,6 +234,7 @@ npm run check:docs
 npm test
 npm run test:browser
 npm run build
+npm run measure:bus
 npm run check:package
 ```
 
