@@ -1,8 +1,8 @@
 # module-frontend
 
 A React micro-frontend library for publishing remote bundles through a dynamic
-manifest and loading them as independently mounted modules. It does not use
-Module Federation; Providers register module entries on `window`.
+manifest and loading them as independently mounted modules. Providers register
+module entries on `window`; the library does not use Module Federation.
 
 ```sh
 npm install @lib-core-mfe/module-frontend react react-dom
@@ -53,10 +53,7 @@ Pass the remote module's props as a type parameter for compile-time checking:
 ```tsx
 import { Module } from "@lib-core-mfe/module-frontend/client";
 
-type CartProps = {
-  entityId: string;
-  onActionEvent: (event: Event) => void;
-};
+type CartProps = { entityId: string; onActionEvent: (event: Event) => void };
 
 <Module<CartProps>
   name="cart"
@@ -100,9 +97,12 @@ Opt in to Shadow DOM style isolation with `isolateStyles`:
 
 The host's CSS does not enter the module, and the module's CSS does not leak
 into the host. CSS custom properties still cross the boundary intentionally.
+The shadow host starts with `:host { all: initial; display: block }`, so
+inherited host styles such as fonts and colors are reset.
 JavaScript, `window`, storage, cookies accessible to JavaScript, and global
-events are **not** isolated. Each module has its own React runtime because it
-is bundled and mounted with its own root; this is separate from CSS isolation.
+events are **not** isolated. The module uses an independent React runtime only
+when its Provider bundle includes React and React DOM; this build choice is not
+enforced by the library.
 
 The Provider supplies module CSS as text so the Consumer can inject it into the
 shadow root:
@@ -113,65 +113,105 @@ Modularize("cart", Cart, { appName: "shop", styles: cssText }); // string or str
 
 Stylesheets inserted in `document.head` (for example, by `style-loader`) do
 not reach a shadow root. For isolated modules, emit CSS as text (such as Vite's
-`?inline` or Webpack's `css-loader` `exportType: "string"`) and pass it through
-`styles`. Portals should target the `shadowRoot` exposed by `ModuleContext`;
-`ModuleContext.isolateStyles` indicates whether this mode is active.
+`?inline` or `exportType: "string"` in legacy Webpack `css-loader` setups) and
+pass it through `styles`. Portals should target the `shadowRoot` exposed by
+`ModuleContext`; `ModuleContext.isolateStyles` indicates whether this mode is
+active.
+
+| Boundary                                                                        | Isolated?                                                                      |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Host CSS selectors and module CSS selectors                                     | Yes                                                                            |
+| CSS custom properties                                                           | No; they intentionally inherit across the boundary                             |
+| JavaScript, `window`, storage, JavaScript-accessible cookies, and global events | No                                                                             |
+| React runtime                                                                   | Only when the remote bundle includes its own React; unrelated to CSS isolation |
 
 The old `isolate` prop remains temporarily as a deprecated alias and warns
 once. Use `isolateStyles`; the alias is scheduled for removal in version 1.0.
 Shadow DOM is not a JavaScript security sandbox. See
-[ADR 0002](./docs/adr/0002-isolation-model.md).
+[ADR 0002](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0002-isolation-model.md).
 
-## Trust and security
+## Guarantees and limits
 
-Remote scripts execute with the privileges of the host page. `allowedHosts` is
-a trust allowlist, not a sandbox; by default only same-origin modules are
-allowed. For cross-origin runtime diagnostics, the Consumer loads scripts
-with `crossOrigin="anonymous"`, so the Provider must allow the Consumer origin
-through `corsOrigins`.
-
-The Provider publishes SHA-384 SRI hashes. The Consumer applies available
-hashes; set `requireIntegrity` to reject modules without hashes. SRI detects
-script bytes that do not match a trusted manifest, but it does not protect
-against a compromised Provider that can change both the script and manifest.
-Pass `nonce` to `<Module>` for CSP; it is applied to remote scripts and
-injected shadow-root styles. Manifest and JavaScript responses include
-`X-Content-Type-Options: nosniff`. See
-[ADR 0005](./docs/adr/0005-security-model.md).
+- **Allowlist:** by default, only the page's same origin is accepted; add
+  other origins to `allowedHosts`. Loading a remote script executes third-party
+  code in the host page.
+- **Cache:** scripts use `?v=<hash>` and immutable caching; the manifest is
+  served with `no-cache`.
+- **Defaults:** `basePath` is `/modules`, `corsOrigins` is empty, the manifest
+  TTL is 60 seconds, and module loading times out after 15 seconds.
+- **React runtime:** an independent React runtime is possible when the remote
+  bundle includes its own React; the Provider build controls this.
+- **React context:** context from the host's React root does not cross into the
+  separately mounted remote root; pass required values as props or through an
+  explicit integration.
+- **CSS isolation:** enabled only by `<Module isolateStyles />`.
+- **Failures:** network, timeout, missing-module, and render errors reach
+  `onError`; failed manifest and script requests are not retained in cache.
+- **Integrity:** SRI hashes are applied when present; `requireIntegrity`
+  defaults to `false` and makes hashes mandatory when enabled.
 
 ## Contract compatibility
 
-Provider and Consumer validate contract version `1` in both the manifest and
-the registered entry. Consumers reject Providers with a missing or
-incompatible contract before attempting to mount the module. Upgrade both
-sides together. Increment `CONTRACT_VERSION` for incompatible manifest or
-entry changes. See [ADR 0003](./docs/adr/0003-contract-version.md).
+Provider and Consumer validate contract version `1` in the manifest and
+registered entry. A missing or incompatible contract is reported through the
+Consumer's `onError` path. Upgrade Provider and Consumer together, and
+increment `CONTRACT_VERSION` for incompatible manifest or entry changes. See
+[ADR 0003](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0003-contract-version.md).
+
+| Checked value                    | Where            | Behavior                              |
+| -------------------------------- | ---------------- | ------------------------------------- |
+| Contract version                 | Manifest         | Checked before downloading scripts    |
+| Contract version and entry shape | Registered entry | Checked before mounting the component |
 
 ## Manifest cache and updates
 
 Manifests are cached for 60 seconds by default. While mounted, `<Module>`
-revalidates after each TTL interval and calls `onUpdateAvailable` once per new
-version with `{ previous, current }`. Setting `manifestTtlMs={0}` disables
-automatic polling and bypasses completed manifest cache entries on subsequent
-loads.
+revalidates after each TTL interval and, when `onUpdateAvailable` is supplied,
+notifies once per newly observed Provider version with `{ previous, current }`.
+Setting `manifestTtlMs={0}` disables automatic polling and bypasses completed
+manifest cache entries on subsequent loads.
 
 A newly published version does not replace a module already mounted on the
-page. The global registry uses _first registration wins_ to avoid mixing
-React runtimes and contexts; reload the page to activate an update. See
-[ADR 0004](./docs/adr/0004-cache-and-versioning.md).
+page. The global registry uses _first registration wins_ to avoid silently
+replacing its React runtime and context; reload the page to activate an update.
+The explicit fallback `retry` action is for recovery after a failure, not
+routine version adoption. See
+[ADR 0004](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0004-cache-and-versioning.md).
+
+## Threat model
+
+Remote scripts execute with the privileges of the host page and can access
+`window`, storage, JavaScript-accessible cookies, and APIs available to the
+host. `allowedHosts` is a trust allowlist, not a sandbox. Shadow DOM isolates
+CSS, not JavaScript.
+
+The Consumer loads scripts with `crossOrigin="anonymous"` for cross-origin
+runtime diagnostics; the Provider must allow the Consumer origin through
+`corsOrigins`. `serveModules` publishes SHA-384 SRI hashes. Set
+`requireIntegrity` to reject modules without hashes. SRI detects script bytes
+that differ from a trusted manifest, but it does not protect against a
+compromised Provider that can change both the bundle and its manifest.
+
+Pass `nonce` to `<Module>` for CSP; it is applied to remote scripts and
+injected shadow-root styles. Manifest and JavaScript responses include
+`X-Content-Type-Options: nosniff`. See
+[ADR 0005](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0005-security-model.md).
 
 ## Development
 
 ```sh
-npm run typecheck      # TypeScript
-npm run lint           # ESLint and React Hooks rules
-npm run format         # Apply Prettier
-npm run format:check   # Check formatting
-npm test               # Unit and integration tests
-npm run test:browser   # Real Chromium browser tests (CHROMIUM_PATH if needed)
-npm run build          # ESM, CJS, and declaration bundles
-npm run check:package  # Build, publint, attw, and npm pack --dry-run
+npm run typecheck
+npm run lint
+npm run format
+npm run format:check
+npm run check:docs
+npm test
+npm run test:browser
+npm run build
+npm run check:package
 ```
 
-CI runs the unit and integration tests against React 18 and React 19. See the
-[ADR index](./docs/adr/README.md) for the architecture decisions.
+The CI workflow runs the quality checks, tests against supported React
+versions, and the real-browser suite. See the
+[ADR index](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/README.md)
+and [documentation index](https://github.com/fidelis27/module-frontend/blob/main/docs/README.md).

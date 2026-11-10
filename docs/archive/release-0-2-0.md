@@ -1,6 +1,5 @@
-> Archived: this duplicate release note was retained for historical reference
-> on 2026-11-07. It is not maintained; `CHANGELOG.md` is the canonical change
-> history.
+> Archived duplicate note; not maintained.
+> `CHANGELOG.md` is the canonical change history.
 
 # Archived duplicate release notes for 0.2.0
 

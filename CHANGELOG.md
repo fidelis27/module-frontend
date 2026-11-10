@@ -6,8 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [0.2.0] - 2026-11-06
 
-The duplicate release-note document is retained in the
-[documentation archive](./docs/README.md#historical-documentation).
+See the release summary in this section and the
+[documentation archive index](./docs/archive/README.md) for the retained
+historical duplicate.
 
 ### Added
 

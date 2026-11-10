@@ -1,46 +1,56 @@
-# module-frontend
+# module-frontend (Português Brasileiro)
 
-Documentação em português brasileiro.
+Uma biblioteca React para micro frontends que publica bundles remotos por meio
+de um manifesto dinâmico e os carrega como módulos montados em raízes próprias.
+Providers registram entradas de módulos em `window`; a biblioteca não usa
+Module Federation.
 
-Remote modules para micro-frontends: o Provider publica bundles + um manifesto dinâmico, o Consumer carrega o módulo e o monta numa raiz React isolada. Sem Module Federation; o registro é feito na `window`.
-
-```
-npm i @lib-core-mfe/module-frontend react react-dom
+```sh
+npm install @lib-core-mfe/module-frontend react react-dom
 ```
 
 ## Provider
 
+Registre cada módulo remoto no bundle:
+
 ```tsx
-// app/modules/cart/index.tsx
 import { Modularize } from "@lib-core-mfe/module-frontend/client";
 
-export default Modularize("cart", ({ entityId }) => <p>{entityId}</p>, {
-  appName: "shop",
-});
+type CartProps = { entityId: string };
+
+export default Modularize(
+  "cart",
+  ({ entityId }: CartProps) => <p>{entityId}</p>,
+  { appName: "shop" },
+);
 ```
 
-Gere um bundle IIFE por módulo (`dist/modules/cart.js`) e sirva com o middleware:
+Gere um bundle IIFE por módulo (por exemplo, `dist/modules/cart.js`) e sirva os
+bundles e o manifesto:
 
-```js
+```ts
 import { serveModules } from "@lib-core-mfe/module-frontend/server";
 
 app.use(
   serveModules({
     modulesPath: "./dist/modules",
-    appName: "shop", // igual ao appName do Modularize
+    appName: "shop",
     corsOrigins: ["https://app.example.com"],
-    include: ["cart", "profile"], // opcional: allowlist de nomes exatos
-    exclude: ["profile"], // opcional: prevalece sobre include
+    include: ["cart", "profile"],
+    exclude: ["profile"],
   }),
 );
-// manifesto: GET /modules/__modules_configuration
+// GET /modules/__modules_configuration
 ```
 
-Sem `include`, todos os bundles `.js` no diretório são publicados. `exclude`
-sempre bloqueia o módulo correspondente, tanto no manifesto quanto no endpoint
-do script.
+`include` e `exclude` são filtros opcionais por nome exato. Sem `include`,
+todos os bundles `.js` no diretório são publicados. `exclude` tem precedência
+e impede tanto a publicação no manifesto quanto o acesso direto ao script.
 
 ## Consumer
+
+Passe as props do módulo remoto como parâmetro de tipo para verificá-las em
+tempo de compilação:
 
 ```tsx
 import { Module } from "@lib-core-mfe/module-frontend/client";
@@ -52,10 +62,10 @@ type CartProps = { entityId: string; onActionEvent: (event: Event) => void };
   host="https://provider.example.com"
   allowedHosts={["https://provider.example.com"]}
   entityId="42"
-  onActionEvent={(e) => console.log(e)}
+  onActionEvent={(event) => console.log(event)}
   manifestTtlMs={60_000}
   onUpdateAvailable={({ previous, current }) => {
-    console.info(`Nova versão disponível: ${previous} → ${current}`);
+    console.info(`Update available: ${previous} → ${current}`);
   }}
   loading={<Spinner />}
   fallback={<Unavailable />}
@@ -63,124 +73,150 @@ type CartProps = { entityId: string; onActionEvent: (event: Event) => void };
 />;
 ```
 
-O tipo genérico de `<Module<CartProps>>` verifica as props específicas do
-módulo; elas são repassadas ao componente remoto. Sem tipo explícito, props
-adicionais continuam aceitas por compatibilidade.
-`moduleLifeCycleEvent.onMounted` é chamado uma vez depois do primeiro commit do
-componente remoto; `onCriticalFailure` sinaliza erros de renderização.
+Sem um parâmetro de tipo explícito, props adicionais continuam aceitas por
+compatibilidade. `moduleLifeCycleEvent.onMounted` é chamado uma vez após o
+commit do componente remoto; `onCriticalFailure` informa erros de renderização.
 
-`fallback` aceita um elemento React ou uma função que recebe `retry`. Isso
-permite oferecer uma nova tentativa tanto após falhas de carregamento quanto
-após erros de render; a tentativa revalida o manifesto e recarrega o script:
+`fallback` pode ser um elemento React ou uma função que recebe `retry`. A nova
+tentativa revalida o manifesto e recarrega o script remoto após falha no
+carregamento ou na renderização:
 
 ```tsx
 <Module
   name="cart"
   host={HOST}
-  fallback={({ retry }) => <button onClick={retry}>Tentar novamente</button>}
+  fallback={({ retry }) => <button onClick={retry}>Try again</button>}
 />
 ```
 
-### Isolamento de CSS (`isolateStyles`)
+## CSS isolation
+
+Ative o isolamento de estilos com Shadow DOM usando `isolateStyles`:
 
 ```tsx
 <Module name="cart" host={HOST} allowedHosts={[HOST]} isolateStyles />
 ```
 
-Com `isolateStyles`, o módulo é montado num **Shadow DOM**: o CSS do host não entra no módulo, o CSS do módulo não vaza para o host e a herança de fonte/cor do host é cortada (`:host { all: initial }`).
+O CSS do host não entra no módulo, e o CSS do módulo não vaza para o host.
+Variáveis CSS customizadas atravessam essa fronteira intencionalmente.
+O host do shadow root começa com `:host { all: initial; display: block }`,
+reiniciando estilos herdados do host, como fontes e cores.
+JavaScript, `window`, storage, cookies acessíveis por JavaScript e eventos
+globais **não** são isolados. O módulo usa um runtime React independente somente
+se o bundle do Provider incluir React e React DOM; a biblioteca não impõe essa
+configuração de build.
 
-O Provider declara o CSS do módulo como texto, e o Consumer o injeta dentro do shadow root:
+O Provider fornece o CSS do módulo como texto para que o Consumer o injete no
+shadow root:
 
 ```tsx
-Modularize("cart", Cart, { appName: "shop", styles: cssText }); // string ou string[]
+Modularize("cart", Cart, { appName: "shop", styles: cssText }); // string or string[]
 ```
 
-O antigo prop `isolate` continua como alias depreciado e emite um `console.warn` apenas uma vez. Prefira `isolateStyles`; o alias será removido na versão 1.0.
+Folhas de estilo inseridas em `document.head` (por exemplo, pelo `style-loader`)
+não alcançam o shadow root. Para módulos isolados, gere o CSS como texto (como
+o `?inline` do Vite ou `exportType: "string"` em configurações legadas do
+`css-loader` do Webpack) e passe-o em `styles`. Portais devem usar o
+`shadowRoot` exposto por `ModuleContext`; `ModuleContext.isolateStyles` indica
+se esse modo está ativo.
 
-| O que é isolado                                                                    | `isolateStyles`                                                   |
-| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| CSS do host contra o módulo e CSS do módulo contra o host                          | Sim                                                               |
-| Variáveis CSS customizadas (`--cor`)                                               | Não; atravessam a fronteira por design                            |
-| JavaScript, `window`, storage, cookies acessíveis por JavaScript e eventos globais | Não                                                               |
-| Versão do React                                                                    | Sim; cada módulo usa o React do próprio bundle e uma raiz própria |
+| Fronteira                                                                          | Isolada?                                                                                |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Seletores CSS do host e do módulo                                                  | Sim                                                                                     |
+| Variáveis CSS customizadas                                                         | Não; herdam intencionalmente entre as fronteiras                                        |
+| JavaScript, `window`, storage, cookies acessíveis por JavaScript e eventos globais | Não                                                                                     |
+| Runtime React                                                                      | Somente se o bundle remoto incluir seu próprio React; não é efeito do isolamento de CSS |
 
-Cuidados:
+A prop antiga `isolate` continua temporariamente como alias depreciado e emite
+um aviso uma única vez. Prefira `isolateStyles`; a remoção do alias está
+planejada para a versão 1.0. Shadow DOM não é um sandbox de JavaScript. Consulte
+[ADR 0002](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0002-isolation-model.md).
 
-- `<style>` colocado em `document.head` (style-loader, por exemplo) **não alcança** o shadow root. Em módulos usados com `isolateStyles`, gere o CSS como texto (ex.: `?inline` no Vite, `css-loader` com `exportType: 'string'` no Webpack) e passe em `styles`.
-- Portais (modais, tooltips) devem apontar para o shadow root. Ele chega no módulo por `useContext(ModuleContext).shadowRoot`.
-- `useContext(ModuleContext).isolateStyles` informa se o módulo está montado em Shadow DOM.
+## Guarantees and limits
 
-## Garantias e limites
+- **Allowlist:** por padrão, somente a mesma origem da página é aceita; adicione
+  outras origens a `allowedHosts`. Carregar um script remoto executa código de
+  terceiros na página hospedeira.
+- **Cache:** scripts usam `?v=<hash>` e cache imutável; o manifesto é servido
+  com `no-cache`.
+- **Padrões:** `basePath` é `/modules`, `corsOrigins` é vazio, o TTL do
+  manifesto é 60 segundos e o carregamento do módulo expira após 15 segundos.
+- **Runtime React:** um runtime React independente é possível quando o bundle
+  remoto inclui seu próprio React; essa configuração é controlada pelo Provider.
+- **Contexto React:** o contexto da raiz React do host não atravessa a raiz
+  separada do módulo remoto; passe os valores necessários por props ou por uma
+  integração explícita.
+- **Isolamento de CSS:** ativado somente por `<Module isolateStyles />`.
+- **Falhas:** erros de rede, timeout, módulo ausente e renderização chegam a
+  `onError`; requisições com falha de manifesto ou script não ficam em cache.
+- **Integridade:** hashes SRI são aplicados quando presentes;
+  `requireIntegrity` é `false` por padrão e torna os hashes obrigatórios quando
+  ativado.
 
-- **Allowlist:** por padrão só a mesma origem da página é aceita; qualquer outro host precisa estar em `allowedHosts`. Carregar script remoto é execução de código de terceiros.
-- **Cache:** scripts saem com `?v=<hash>` e `immutable`; o manifesto é `no-cache`.
-- **Isolamento de React:** o módulo usa o React do próprio bundle (o Provider precisa de React ≥ 18, porque usa `react-dom/client`).
-- **Isolamento de CSS:** só com `<Module isolateStyles />` (veja acima).
-- **Falhas:** erro de rede, timeout, módulo ausente e erro de render chegam em `onError`; falhas não ficam em cache.
+## Contract compatibility
 
-## Compatibilidade do contrato
+Provider e Consumer validam a versão `1` do contrato no manifesto e na entry
+registrada. Um contrato ausente ou incompatível chega pelo caminho `onError`
+do Consumer. Atualize Provider e Consumer juntos e incremente
+`CONTRACT_VERSION` para alterações incompatíveis no manifesto ou na entry.
+Consulte
+[ADR 0003](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0003-contract-version.md).
 
-Provider e Consumer verificam a versão do contrato antes de montar o módulo. Um
-contrato ausente ou diferente resulta em erro explícito e chega ao `onError` do
-Consumer.
+| Valor verificado                      | Onde             | Comportamento                            |
+| ------------------------------------- | ---------------- | ---------------------------------------- |
+| Versão do contrato                    | Manifesto        | Verificada antes de baixar os scripts    |
+| Versão do contrato e formato da entry | Entry registrada | Verificados antes de montar o componente |
 
-| Versão da biblioteca |      Contrato | Compatibilidade                                   |
-| -------------------- | ------------: | ------------------------------------------------- |
-| `0.1.x`              | Não declarado | Rejeitado por Consumers com validação de contrato |
-| `0.2.x`              |           `1` | Compatível com outros módulos de contrato `1`     |
+## Manifest cache and updates
 
-Ao alterar a entry global ou o manifesto de forma incompatível, incremente a
-`CONTRACT_VERSION`. Atualize Provider e Consumer juntos; consulte
-[ADR 0003](./docs/adr/0003-contract-version.md).
+Por padrão, manifestos ficam em cache por 60 segundos. Enquanto está montado,
+`<Module>` revalida a cada intervalo de TTL e, se `onUpdateAvailable` for
+fornecido, notifica uma vez por nova versão observada do Provider com
+`{ previous, current }`. `manifestTtlMs={0}` desativa o polling automático e
+ignora respostas concluídas em cache nas chamadas seguintes.
 
-## Cache e atualização
+Uma versão recém-publicada não substitui um módulo já montado na página. O
+registro global segue _first registration wins_ para não trocar silenciosamente
+seu runtime React e contexto; recarregue a página para ativar uma atualização.
+A ação explícita `retry` do fallback serve para recuperação após uma falha,
+não para adotar uma versão nova no fluxo normal. Consulte
+[ADR 0004](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0004-cache-and-versioning.md).
 
-O manifesto fica em cache por 60 segundos por padrão. O Consumer revalida
-enquanto o módulo permanece montado e chama `onUpdateAvailable` uma vez para
-cada nova versão detectada, com `{ previous, current }`. `manifestTtlMs={0}`
-desativa o cache e o polling automático; uma chamada posterior a `loadModule`
-sempre revalida.
+## Threat model
 
-Uma versão recém-publicada **não substitui o módulo já montado**. O registro
-global usa a política _first registration wins_: carregar e montar duas versões
-do mesmo módulo na mesma página pode misturar contextos e corromper o estado do
-React. Use o callback para decidir quando recarregar a página; a versão nova
-entra após o reload. Consulte [ADR 0004](./docs/adr/0004-cache-and-versioning.md).
+Scripts remotos executam com os privilégios da página hospedeira e podem
+acessar `window`, storage, cookies acessíveis por JavaScript e APIs disponíveis
+ao host. `allowedHosts` é uma lista de confiança, não um sandbox. Shadow DOM
+isola CSS, não JavaScript.
 
-## Modelo de ameaças
+O Consumer carrega scripts com `crossOrigin="anonymous"` para diagnóstico de
+erros remotos; o Provider precisa autorizar a origem do Consumer em
+`corsOrigins`. `serveModules` publica hashes SRI SHA-384. Use
+`requireIntegrity` para rejeitar módulos sem hash. SRI detecta bytes de script
+diferentes de um manifesto confiável, mas não protege contra um Provider
+comprometido que possa alterar tanto o bundle quanto o manifesto.
 
-Scripts remotos executam com os privilégios da página hospedeira: podem acessar
-`window`, storage, cookies acessíveis por JavaScript e APIs disponíveis ao host.
-`allowedHosts` é uma lista de confiança, não um sandbox. Shadow DOM isola CSS,
-não JavaScript.
+Passe `nonce` a `<Module>` para CSP; ele é aplicado aos scripts remotos e aos
+estilos injetados no shadow root. Manifesto e respostas JavaScript incluem
+`X-Content-Type-Options: nosniff`. Consulte
+[ADR 0005](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/0005-security-model.md).
 
-O Consumer carrega scripts com `crossOrigin="anonymous"` para permitir que
-erros remotos incluam stack traces. Por isso, o Provider precisa autorizar a
-origem do Consumer em `corsOrigins`. `serveModules` publica hashes SRI SHA-384;
-use `requireIntegrity` para rejeitar módulos sem hash. SRI detecta conteúdo de
-script diferente do hash esperado quando o manifesto é confiável, mas não
-protege contra um Provider comprometido que possa alterar o bundle e o
-manifesto. `nonce` pode ser passado ao `<Module>` para as políticas CSP do host
-e também é aplicado aos estilos injetados no Shadow DOM.
+## Development
 
-`X-Content-Type-Options: nosniff` é enviado para manifesto e bundles JavaScript.
-Para recomendações e limites completos, veja
-[ADR 0005](./docs/adr/0005-security-model.md).
-
-## Desenvolvimento
-
+```sh
+npm run typecheck
+npm run lint
+npm run format
+npm run format:check
+npm run check:docs
+npm test
+npm run test:browser
+npm run build
+npm run check:package
 ```
-npm run typecheck      # valida os tipos
-npm run lint           # ESLint, incluindo regras dos Hooks do React
-npm run format         # aplica Prettier
-npm run format:check   # verifica a formatação sem alterar arquivos
-npm test               # unitários + e2e com bundles reais (jsdom)
-npm run test:browser   # isolamento de CSS em Chromium real (CHROMIUM_PATH opcional)
-npm run build          # tsup (esm + cjs + d.ts)
-npm run check:package  # build, publint, attw e npm pack --dry-run
-```
 
-O CI também testa os testes unitários com React 18 e React 19.
-
-Consulte o [índice de decisões arquiteturais](./docs/adr/README.md) para ver
-as decisões e trade-offs documentados.
+O workflow de CI executa verificações de qualidade, testes com as versões
+suportadas do React e a suíte em navegador real. Consulte o
+[índice de ADRs](https://github.com/fidelis27/module-frontend/blob/main/docs/adr/README.md)
+e o
+[índice da documentação](https://github.com/fidelis27/module-frontend/blob/main/docs/README.md).
