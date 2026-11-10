@@ -8,7 +8,8 @@
 The Consumer invokes `createRoot`, `createElement`, `ModuleContext`, and
 `Component` from an entry registered by a remote Provider. These values formed
 an implicit runtime contract. Different library versions could therefore fail
-at mount time with confusing errors.
+at mount time with confusing errors. The entry registration model is described
+in [ADR 0001](./0001-module-registry.md).
 
 ## Decision
 

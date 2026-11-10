@@ -18,7 +18,9 @@ See the [0.3.0 release notes](./docs/releases/release-0-3-0.md).
 
 ## [0.2.0] - 2026-11-06
 
-See the [0.2.0 release notes](./docs/releases/release-0-2-0.md).
+See the [0.2.0 release notes](./docs/releases/release-0-2-0.md). The
+[documentation archive index](./docs/archive/README.md) links to the retained
+historical duplicate.
 
 ### Added
 

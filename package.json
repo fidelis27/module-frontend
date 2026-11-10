@@ -93,9 +93,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
+    "check:docs": "node scripts/check-docs.mjs",
     "measure:bus": "node scripts/measure-bus-size.mjs",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.json\" \"*.ts\" \".github/workflows/*.yml\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.json\" \"*.ts\" \".github/workflows/*.yml\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.{mjs,mts}\" \"*.json\" \"*.ts\" \"*.md\" \"docs/**/*.md\" \".github/workflows/*.yml\" \".github/PULL_REQUEST_TEMPLATE/*.md\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.{mjs,mts}\" \"*.json\" \"*.ts\" \"*.md\" \"docs/**/*.md\" \".github/workflows/*.yml\" \".github/PULL_REQUEST_TEMPLATE/*.md\"",
     "check:package": "npm run build && publint && attw --pack . && node -e \"const p=require('./package.json');if(!p.files?.includes('dist')||!require('node:fs').existsSync('dist')){console.error('package.json must include dist in files and dist/ must exist');process.exit(1)}\" && npm pack --dry-run",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "test:browser": "vitest run --config vitest.browser.config.ts"

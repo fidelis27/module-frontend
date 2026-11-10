@@ -8,7 +8,8 @@
 Remote modules are executable third-party JavaScript. They run in the host
 page's JavaScript realm and can use the browser APIs available to that page.
 The host allowlist limits which origins may provide code, but does not sandbox
-that code.
+that code. The global registry and mounting boundary are described in
+[ADR 0001](./0001-module-registry.md).
 
 ## Decision
 

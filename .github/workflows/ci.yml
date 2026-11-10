@@ -13,6 +13,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run check:docs
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
@@ -35,5 +36,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run check:docs
       - run: npm install --no-save --package-lock=false react@${{ matrix.react-version }} react-dom@${{ matrix.react-version }}
       - run: npm test
