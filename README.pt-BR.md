@@ -1,10 +1,10 @@
-# module-frontend
+# module-frontend (Português)
 
 Documentação em português brasileiro.
 
 Remote modules para micro-frontends: o Provider publica bundles + um manifesto dinâmico, o Consumer carrega o módulo e o monta numa raiz React isolada. Sem Module Federation; o registro é feito na `window`.
 
-```
+```sh
 npm i @lib-core-mfe/module-frontend react react-dom
 ```
 
@@ -21,7 +21,7 @@ export default Modularize("cart", ({ entityId }) => <p>{entityId}</p>, {
 
 Gere um bundle IIFE por módulo (`dist/modules/cart.js`) e sirva com o middleware:
 
-```js
+```ts
 import { serveModules } from "@lib-core-mfe/module-frontend/server";
 
 app.use(
@@ -81,7 +81,7 @@ após erros de render; a tentativa revalida o manifesto e recarrega o script:
 />
 ```
 
-### Isolamento de CSS (`isolateStyles`)
+## CSS isolation
 
 ```tsx
 <Module name="cart" host={HOST} allowedHosts={[HOST]} isolateStyles />
@@ -110,44 +110,40 @@ Cuidados:
 - Portais (modais, tooltips) devem apontar para o shadow root. Ele chega no módulo por `useContext(ModuleContext).shadowRoot`.
 - `useContext(ModuleContext).isolateStyles` informa se o módulo está montado em Shadow DOM.
 
-## Garantias e limites
+## Event bus
+
+Use a entrada independente de framework `/bus` para eventos tipados entre
+módulos empacotados separadamente e os hooks de `/client` nos componentes
+React:
+
+```ts
+import { createBus } from "@lib-core-mfe/module-frontend/bus";
+import { createBusHooks } from "@lib-core-mfe/module-frontend/client";
+
+type AppEvents = {
+  "nav:request": { path: string };
+  "student:created": { id: string };
+};
+
+const bus = createBus<AppEvents>();
+export const { usePublish, useSubscribe } = createBusHooks(bus);
+```
+
+`usePublish` atribui o evento ao módulo atual; `useSubscribe` cancela a
+assinatura ao desmontar. A entrega é síncrona. Retenção e replay são opcionais:
+`publish(channel, payload, { ttl })` retém um evento e
+`subscribe(channel, handler, { replay: true })` reproduz eventos não expirados.
+Erros de handlers não impedem a entrega aos outros assinantes. Consulte o
+[guia do event bus](./docs/guides/event-bus-pt-br.md) e as
+[ADRs 0006–0007](./docs/adr/README.md).
+
+## Trust and security
 
 - **Allowlist:** por padrão só a mesma origem da página é aceita; qualquer outro host precisa estar em `allowedHosts`. Carregar script remoto é execução de código de terceiros.
 - **Cache:** scripts saem com `?v=<hash>` e `immutable`; o manifesto é `no-cache`.
 - **Isolamento de React:** o módulo usa o React do próprio bundle (o Provider precisa de React ≥ 18, porque usa `react-dom/client`).
 - **Isolamento de CSS:** só com `<Module isolateStyles />` (veja acima).
 - **Falhas:** erro de rede, timeout, módulo ausente e erro de render chegam em `onError`; falhas não ficam em cache.
-
-## Compatibilidade do contrato
-
-Provider e Consumer verificam a versão do contrato antes de montar o módulo. Um
-contrato ausente ou diferente resulta em erro explícito e chega ao `onError` do
-Consumer.
-
-| Versão da biblioteca |      Contrato | Compatibilidade                                   |
-| -------------------- | ------------: | ------------------------------------------------- |
-| `0.1.x`              | Não declarado | Rejeitado por Consumers com validação de contrato |
-| `0.2.x`              |           `1` | Compatível com outros módulos de contrato `1`     |
-
-Ao alterar a entry global ou o manifesto de forma incompatível, incremente a
-`CONTRACT_VERSION`. Atualize Provider e Consumer juntos; consulte
-[ADR 0003](./docs/adr/0003-contract-version.md).
-
-## Cache e atualização
-
-O manifesto fica em cache por 60 segundos por padrão. O Consumer revalida
-enquanto o módulo permanece montado e chama `onUpdateAvailable` uma vez para
-cada nova versão detectada, com `{ previous, current }`. `manifestTtlMs={0}`
-desativa o cache e o polling automático; uma chamada posterior a `loadModule`
-sempre revalida.
-
-Uma versão recém-publicada **não substitui o módulo já montado**. O registro
-global usa a política _first registration wins_: carregar e montar duas versões
-do mesmo módulo na mesma página pode misturar contextos e corromper o estado do
-React. Use o callback para decidir quando recarregar a página; a versão nova
-entra após o reload. Consulte [ADR 0004](./docs/adr/0004-cache-and-versioning.md).
-
-## Modelo de ameaças
 
 Scripts remotos executam com os privilégios da página hospedeira: podem acessar
 `window`, storage, cookies acessíveis por JavaScript e APIs disponíveis ao host.
@@ -167,16 +163,46 @@ e também é aplicado aos estilos injetados no Shadow DOM.
 Para recomendações e limites completos, veja
 [ADR 0005](./docs/adr/0005-security-model.md).
 
-## Desenvolvimento
+## Contract compatibility
 
-```
+Provider e Consumer verificam a versão do contrato antes de montar o módulo. Um
+contrato ausente ou diferente resulta em erro explícito e chega ao `onError` do
+Consumer.
+
+| Library version | Contract     | Compatibility                                    |
+| --------------- | ------------ | ------------------------------------------------ |
+| `0.1.x`         | Not declared | Rejected by Consumers that validate the contract |
+| `0.2.x`         | `1`          | Compatible with other modules using contract `1` |
+
+Ao alterar a entry global ou o manifesto de forma incompatível, incremente a
+`CONTRACT_VERSION`. Atualize Provider e Consumer juntos; consulte
+[ADR 0003](./docs/adr/0003-contract-version.md).
+
+## Manifest cache and updates
+
+O manifesto fica em cache por 60 segundos por padrão. O Consumer revalida
+enquanto o módulo permanece montado e chama `onUpdateAvailable` uma vez para
+cada nova versão detectada, com `{ previous, current }`. `manifestTtlMs={0}`
+desativa o cache e o polling automático; uma chamada posterior a `loadModule`
+sempre revalida.
+
+Uma versão recém-publicada **não substitui o módulo já montado**. O registro
+global usa a política _first registration wins_: carregar e montar duas versões
+do mesmo módulo na mesma página pode misturar contextos e corromper o estado do
+React. Use o callback para decidir quando recarregar a página; a versão nova
+entra após o reload. Consulte [ADR 0004](./docs/adr/0004-cache-and-versioning.md).
+
+## Development
+
+```sh
 npm run typecheck      # valida os tipos
 npm run lint           # ESLint, incluindo regras dos Hooks do React
 npm run format         # aplica Prettier
 npm run format:check   # verifica a formatação sem alterar arquivos
 npm test               # unitários + e2e com bundles reais (jsdom)
-npm run test:browser   # isolamento de CSS em Chromium real (CHROMIUM_PATH opcional)
+npm run test:browser   # testes em navegador real (CHROMIUM_PATH opcional)
 npm run build          # tsup (esm + cjs + d.ts)
+npm run measure:bus    # tamanho minificado/gzip do bus e hooks
 npm run check:package  # build, publint, attw e npm pack --dry-run
 ```
 

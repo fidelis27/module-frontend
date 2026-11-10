@@ -122,6 +122,39 @@ once. Use `isolateStyles`; the alias is scheduled for removal in version 1.0.
 Shadow DOM is not a JavaScript security sandbox. See
 [ADR 0002](./docs/adr/0002-isolation-model.md).
 
+| Boundary                                                                        | Isolated?                                                            |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Host CSS selectors and module CSS selectors                                     | Yes                                                                  |
+| CSS custom properties                                                           | No; they intentionally inherit across the boundary                   |
+| JavaScript, `window`, storage, JavaScript-accessible cookies, and global events | No                                                                   |
+| React runtime                                                                   | Only when the remote bundle includes its own React; unrelated to CSS |
+
+## Event bus
+
+Use the framework-independent `/bus` entry for typed events shared across
+independently bundled modules, and the `/client` hooks from React components:
+
+```ts
+import { createBus } from "@lib-core-mfe/module-frontend/bus";
+import { createBusHooks } from "@lib-core-mfe/module-frontend/client";
+
+type AppEvents = {
+  "nav:request": { path: string };
+  "student:created": { id: string };
+};
+
+const bus = createBus<AppEvents>();
+export const { usePublish, useSubscribe } = createBusHooks(bus);
+```
+
+`usePublish` attributes events to the current module; `useSubscribe` cleans up
+on unmount. Delivery is synchronous. Retention and replay are opt-in:
+`publish(channel, payload, { ttl })` retains an event and
+`subscribe(channel, handler, { replay: true })` replays unexpired events.
+Handler errors do not stop delivery to other subscribers. See the
+[event bus guide](./docs/guides/event-bus.md) and
+[ADRs 0006–0007](./docs/adr/README.md).
+
 ## Trust and security
 
 Remote scripts execute with the privileges of the host page. `allowedHosts` is
@@ -147,6 +180,11 @@ incompatible contract before attempting to mount the module. Upgrade both
 sides together. Increment `CONTRACT_VERSION` for incompatible manifest or
 entry changes. See [ADR 0003](./docs/adr/0003-contract-version.md).
 
+| Library version | Contract     | Compatibility                                    |
+| --------------- | ------------ | ------------------------------------------------ |
+| `0.1.x`         | Not declared | Rejected by Consumers that validate the contract |
+| `0.2.x`         | `1`          | Compatible with other modules using contract `1` |
+
 ## Manifest cache and updates
 
 Manifests are cached for 60 seconds by default. While mounted, `<Module>`
@@ -170,6 +208,7 @@ npm run format:check   # Check formatting
 npm test               # Unit and integration tests
 npm run test:browser   # Real Chromium browser tests (CHROMIUM_PATH if needed)
 npm run build          # ESM, CJS, and declaration bundles
+npm run measure:bus    # Minified/gzip size of the bus and hooks
 npm run check:package  # Build, publint, attw, and npm pack --dry-run
 ```
 

@@ -4,9 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0-rc.1] - 2026-11-10
+
+### Added
+
+- Add a typed global event bus with optional retention and replay, isolated
+  handler errors, event metadata, and diagnostics.
+- Add React hooks for publishing with module source attribution and
+  subscribing with automatic cleanup.
+- Document event bus usage, integration limits, and migration guidance.
+
+See the [0.3.0 release notes](./docs/releases/release-0-3-0.md).
+
 ## [0.2.0] - 2026-11-06
 
-See the [0.2.0 release notes](./docs/releases/0.2.0.md).
+See the [0.2.0 release notes](./docs/releases/release-0-2-0.md).
 
 ### Added
 
